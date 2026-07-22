@@ -2,7 +2,14 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { Pencil, Plus, Power, PowerOff, Trash2 } from "lucide-react";
+import {
+  CreditCard,
+  Pencil,
+  Plus,
+  Power,
+  PowerOff,
+  Trash2,
+} from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { DataTableShell } from "@/components/ui/DataTableShell";
@@ -16,6 +23,7 @@ import {
 import { useAsyncList } from "@/hooks/useAsyncList";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import { expensesApi } from "@/services/expenses.api";
+import { creditsApi } from "@/services/credits.api";
 import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
 import {
@@ -24,7 +32,19 @@ import {
   EXPENSE_TYPE_LABELS,
 } from "@/lib/expense-labels";
 import { buildExpensePayload, expenseToFormValues } from "@/lib/expense-form";
-import type { Expense, House } from "@/types/models";
+import type { Credit, Expense, House } from "@/types/models";
+
+function creditIdOf(creditAccount: Expense["creditAccount"]) {
+  if (!creditAccount) return null;
+  return typeof creditAccount === "string" ? creditAccount : creditAccount._id;
+}
+
+function creditNameOf(creditAccount: Expense["creditAccount"], credits: Credit[]) {
+  const id = creditIdOf(creditAccount);
+  if (!id) return null;
+  if (typeof creditAccount === "object" && creditAccount) return creditAccount.name;
+  return credits.find((c) => c._id === id)?.name ?? "Tarjeta";
+}
 
 function creatorName(createdBy: Expense["createdBy"]) {
   return typeof createdBy === "string"
@@ -35,9 +55,11 @@ function creatorName(createdBy: Expense["createdBy"]) {
 function ExpensesTable({
   houseId,
   filters,
+  credits,
 }: {
   houseId: string;
   filters: { type: string; active: string };
+  credits: Credit[];
 }) {
   const apiFilters: Record<string, string> = {};
   if (filters.type) apiFilters.type = filters.type;
@@ -52,9 +74,10 @@ function ExpensesTable({
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [applyingId, setApplyingId] = useState<string | null>(null);
 
   const handleSubmit = async (values: ExpenseFormValues) => {
-    const payload = buildExpensePayload(values);
+    const payload = buildExpensePayload(values, Boolean(editingExpense));
     if (editingExpense) {
       await expensesApi.update(houseId, editingExpense._id, payload);
       toast.success("Gasto actualizado correctamente");
@@ -100,6 +123,23 @@ function ExpensesTable({
     }
   };
 
+  const handleApplyToCredit = async (expense: Expense) => {
+    const creditId = creditIdOf(expense.creditAccount);
+    if (!creditId) return;
+    setApplyingId(expense._id);
+    try {
+      await creditsApi.applyExpense(creditId, expense._id);
+      toast.success("Gasto aplicado a la tarjeta correctamente");
+      reload();
+    } catch (err) {
+      toast.error(
+        getErrorMessage(err, "No se pudo aplicar el gasto a la tarjeta.")
+      );
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex justify-end">
@@ -130,6 +170,9 @@ function ExpensesTable({
               <th className="px-4 py-3 font-medium">Tipo</th>
               <th className="hidden px-4 py-3 font-medium md:table-cell">
                 Creado por
+              </th>
+              <th className="hidden px-4 py-3 font-medium lg:table-cell">
+                Tarjeta
               </th>
               <th className="px-4 py-3 font-medium">Estado</th>
               <th className="px-4 py-3 font-medium">Acciones</th>
@@ -163,8 +206,38 @@ function ExpensesTable({
                 <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 md:table-cell">
                   {creatorName(expense.createdBy)}
                 </td>
+                <td className="hidden px-4 py-3 lg:table-cell">
+                  {expense.creditAccount ? (
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4 w-4 shrink-0 text-zinc-400" />
+                      <span className="text-zinc-600 dark:text-zinc-400">
+                        {creditNameOf(expense.creditAccount, credits)}
+                      </span>
+                      {expense.appliedToCredit ? (
+                        <span className="text-xs text-green-600 dark:text-green-400">
+                          Aplicado
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleApplyToCredit(expense)}
+                          disabled={applyingId === expense._id}
+                          className="rounded-full bg-black/[.06] px-2 py-0.5 text-xs font-medium text-zinc-700 hover:bg-black/[.1] disabled:opacity-50 dark:bg-white/[.08] dark:text-zinc-300"
+                        >
+                          Aplicar
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <span className="text-zinc-400">—</span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
-                  {expense.active ? (
+                  {expense.type === "unico" ? (
+                    <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                      Registrado
+                    </span>
+                  ) : expense.active ? (
                     <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-400">
                       Activo
                     </span>
@@ -188,24 +261,28 @@ function ExpensesTable({
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(expense)}
-                      disabled={togglingId === expense._id}
-                      aria-label={expense.active ? "Desactivar gasto" : "Activar gasto"}
-                      title={expense.active ? "Desactivar" : "Activar"}
-                      className={`rounded-lg p-2 disabled:opacity-50 ${
-                        expense.active
-                          ? "text-amber-600 hover:bg-amber-600/10 dark:text-amber-400"
-                          : "text-green-600 hover:bg-green-600/10 dark:text-green-400"
-                      }`}
-                    >
-                      {expense.active ? (
-                        <PowerOff className="h-4 w-4" />
-                      ) : (
-                        <Power className="h-4 w-4" />
-                      )}
-                    </button>
+                    {expense.type !== "unico" && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleActive(expense)}
+                        disabled={togglingId === expense._id}
+                        aria-label={
+                          expense.active ? "Desactivar gasto" : "Activar gasto"
+                        }
+                        title={expense.active ? "Desactivar" : "Activar"}
+                        className={`rounded-lg p-2 disabled:opacity-50 ${
+                          expense.active
+                            ? "text-amber-600 hover:bg-amber-600/10 dark:text-amber-400"
+                            : "text-green-600 hover:bg-green-600/10 dark:text-green-400"
+                        }`}
+                      >
+                        {expense.active ? (
+                          <PowerOff className="h-4 w-4" />
+                        ) : (
+                          <Power className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => setDeletingExpense(expense)}
@@ -230,6 +307,8 @@ function ExpensesTable({
         initialValues={
           editingExpense ? expenseToFormValues(editingExpense) : undefined
         }
+        credits={credits}
+        creditLocked={Boolean(editingExpense?.appliedToCredit)}
       />
 
       <ConfirmDialog
@@ -258,6 +337,8 @@ function GastosContent() {
     selectedId,
     selectHouse,
   } = useMyHouses();
+
+  const { items: credits } = useAsyncList<Credit>(creditsApi.list);
 
   const [filters, setFilters] = useState({ type: "", active: "" });
 
@@ -329,6 +410,7 @@ function GastosContent() {
             key={`${selectedHouse._id}:${filters.type}:${filters.active}`}
             houseId={selectedHouse._id}
             filters={filters}
+            credits={credits}
           />
         </>
       )}

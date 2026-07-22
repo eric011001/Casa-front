@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
+  CreditCard,
   Home,
   House,
   LogOut,
@@ -34,6 +35,7 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: "Casas", href: "/casas", permission: "houses:read", icon: House },
   { label: "Gastos", href: "/gastos", permission: null, icon: Wallet },
+  { label: "Créditos", href: "/creditos", permission: null, icon: CreditCard },
 ];
 
 function canSee(permission: string | string[] | null, granted: string[]) {

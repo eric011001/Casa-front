@@ -39,6 +39,20 @@ export type Expense = {
   installments?: number;
   startDate: string;
   active: boolean;
+  creditAccount?: string | Credit | null;
+  appliedToCredit?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Credit = {
+  _id: string;
+  user: string;
+  name: string;
+  bank?: string;
+  currentDebt: number;
+  limit: number;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 };

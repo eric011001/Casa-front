@@ -9,7 +9,7 @@ import { TextField } from "@/components/ui/TextField";
 import { SelectField } from "@/components/ui/SelectField";
 import { getErrorMessage } from "@/lib/http-error";
 import { EXPENSE_CATEGORY_OPTIONS, EXPENSE_TYPE_OPTIONS } from "@/lib/expense-labels";
-import type { ExpenseCategory, ExpenseType } from "@/types/models";
+import type { Credit, ExpenseCategory, ExpenseType } from "@/types/models";
 
 export type ExpenseFormValues = {
   type: ExpenseType;
@@ -19,6 +19,7 @@ export type ExpenseFormValues = {
   startDate: string;
   frequency: "semanal" | "mensual" | "";
   installments: string;
+  creditAccount: string;
 };
 
 const EMPTY_VALUES: ExpenseFormValues = {
@@ -29,6 +30,7 @@ const EMPTY_VALUES: ExpenseFormValues = {
   startDate: "",
   frequency: "",
   installments: "",
+  creditAccount: "",
 };
 
 const schema = Yup.object({
@@ -67,11 +69,15 @@ export function ExpenseFormModal({
   onClose,
   onSubmit,
   initialValues,
+  credits,
+  creditLocked = false,
 }: {
   open: boolean;
   onClose: () => void;
   onSubmit: (values: ExpenseFormValues) => Promise<void>;
   initialValues?: ExpenseFormValues;
+  credits: Credit[];
+  creditLocked?: boolean;
 }) {
   const isEdit = Boolean(initialValues);
 
@@ -140,6 +146,26 @@ export function ExpenseFormModal({
                 min="1"
                 step="1"
               />
+            )}
+
+            <SelectField
+              label="Tarjeta (opcional)"
+              name="creditAccount"
+              disabled={creditLocked}
+            >
+              <option value="">Sin tarjeta</option>
+              {credits.map((credit) => (
+                <option key={credit._id} value={credit._id}>
+                  {credit.name}
+                  {credit.bank ? ` · ${credit.bank}` : ""}
+                </option>
+              ))}
+            </SelectField>
+            {creditLocked && (
+              <p className="-mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                Este gasto ya fue aplicado a una tarjeta y no se puede
+                reasignar.
+              </p>
             )}
 
             <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
