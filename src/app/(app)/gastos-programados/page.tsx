@@ -366,8 +366,8 @@ function GastosProgramadosContent() {
           Gastos Programados
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Administra las suscripciones y préstamos recurrentes de las casas a
-          las que perteneces.
+          Administra las suscripciones, servicios y préstamos recurrentes de
+          las casas a las que perteneces.
         </p>
       </div>
 

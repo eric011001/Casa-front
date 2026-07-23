@@ -2,6 +2,7 @@ export const EXPENSE_TYPE_LABELS: Record<string, string> = {
   unico: "Único",
   suscripcion: "Suscripción",
   prestamo: "Préstamo",
+  servicio: "Servicio",
 };
 
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {

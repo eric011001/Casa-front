@@ -15,9 +15,9 @@ export type House = {
   updatedAt: string;
 };
 
-export type ExpenseType = "unico" | "suscripcion" | "prestamo";
-export type ScheduledExpenseType = "suscripcion" | "prestamo";
-export type ExpenseFrequency = "semanal" | "mensual";
+export type ExpenseType = "unico" | "suscripcion" | "prestamo" | "servicio";
+export type ScheduledExpenseType = "suscripcion" | "prestamo" | "servicio";
+export type ExpenseFrequency = "semanal" | "quincenal" | "mensual";
 export type ExpenseCategory =
   | "comida"
   | "transporte"

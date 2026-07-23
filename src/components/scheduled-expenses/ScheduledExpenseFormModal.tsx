@@ -18,7 +18,7 @@ export type ScheduledExpenseFormValues = {
   amount: string;
   category: ExpenseCategory;
   startDate: string;
-  frequency: "semanal" | "mensual" | "";
+  frequency: "semanal" | "quincenal" | "mensual" | "";
   installments: string;
   creditAccount: string;
 };
@@ -36,7 +36,7 @@ const EMPTY_VALUES: ScheduledExpenseFormValues = {
 
 const schema = Yup.object({
   type: Yup.string()
-    .oneOf(["suscripcion", "prestamo"])
+    .oneOf(["suscripcion", "prestamo", "servicio"])
     .required("Selecciona un tipo"),
   name: Yup.string().trim().required("El nombre es requerido"),
   amount: Yup.number()
@@ -46,7 +46,7 @@ const schema = Yup.object({
   category: Yup.string().required("Selecciona una categoría"),
   startDate: Yup.string().required("La fecha es requerida"),
   frequency: Yup.string()
-    .oneOf(["semanal", "mensual"], "Selecciona una frecuencia")
+    .oneOf(["semanal", "quincenal", "mensual"], "Selecciona una frecuencia")
     .required("Selecciona una frecuencia"),
   installments: Yup.number().when("type", {
     is: "prestamo",
@@ -129,6 +129,7 @@ export function ScheduledExpenseFormModal({
             <SelectField label="Frecuencia" name="frequency">
               <option value="">Selecciona una frecuencia</option>
               <option value="semanal">Semanal</option>
+              <option value="quincenal">Quincenal (días 15 y último del mes)</option>
               <option value="mensual">Mensual</option>
             </SelectField>
 

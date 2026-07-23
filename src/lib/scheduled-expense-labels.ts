@@ -1,10 +1,12 @@
 export const SCHEDULED_EXPENSE_TYPE_LABELS: Record<string, string> = {
   suscripcion: "Suscripción",
   prestamo: "Préstamo",
+  servicio: "Servicio",
 };
 
 export const EXPENSE_FREQUENCY_LABELS: Record<string, string> = {
   semanal: "Semanal",
+  quincenal: "Quincenal",
   mensual: "Mensual",
 };
 
