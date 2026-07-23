@@ -4,6 +4,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LoadingBar } from "@/components/ui/LoadingBar";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import { StatsPanel } from "@/components/home/StatsPanel";
+import { ExpenseCalendar } from "@/components/home/ExpenseCalendar";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import type { House } from "@/types/models";
 
@@ -55,7 +56,10 @@ function HomeContent() {
           estadísticas.
         </p>
       ) : (
-        <StatsPanel key={selectedHouse._id} houseId={selectedHouse._id} />
+        <>
+          <ExpenseCalendar key={`${selectedHouse._id}-calendar`} houseId={selectedHouse._id} />
+          <StatsPanel key={selectedHouse._id} houseId={selectedHouse._id} />
+        </>
       )}
     </div>
   );

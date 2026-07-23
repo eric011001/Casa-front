@@ -126,3 +126,20 @@ export type ExpenseStats = {
     total: number;
   }[];
 };
+
+export type PeriodOccurrence = {
+  date: string;
+  installmentNumber: number | null;
+  materialized: boolean;
+};
+
+export type PeriodExpenseGroup = {
+  expense: Expense | ScheduledExpense;
+  occurrences: PeriodOccurrence[];
+};
+
+export type PeriodResponse = {
+  period: { from: string; to: string };
+  total: number;
+  expenses: PeriodExpenseGroup[];
+};
