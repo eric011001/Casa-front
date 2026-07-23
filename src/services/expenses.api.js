@@ -21,12 +21,16 @@ export const expensesApi = {
     await httpClient.delete(`/houses/${houseId}/expenses/${id}`);
   },
 
-  activate: async (houseId, id) =>
-    (await httpClient.patch(`/houses/${houseId}/expenses/${id}/activate`)).data,
+  pay: async (houseId, id, paidAt) =>
+    (
+      await httpClient.patch(
+        `/houses/${houseId}/expenses/${id}/pay`,
+        paidAt ? { paidAt } : {}
+      )
+    ).data,
 
-  deactivate: async (houseId, id) =>
-    (await httpClient.patch(`/houses/${houseId}/expenses/${id}/deactivate`))
-      .data,
+  unpay: async (houseId, id) =>
+    (await httpClient.patch(`/houses/${houseId}/expenses/${id}/unpay`)).data,
 
   period: async (houseId, params = {}) =>
     (await httpClient.get(`/houses/${houseId}/expenses/period`, { params }))

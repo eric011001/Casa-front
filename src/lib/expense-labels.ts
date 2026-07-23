@@ -4,11 +4,6 @@ export const EXPENSE_TYPE_LABELS: Record<string, string> = {
   prestamo: "Préstamo",
 };
 
-export const EXPENSE_FREQUENCY_LABELS: Record<string, string> = {
-  semanal: "Semanal",
-  mensual: "Mensual",
-};
-
 export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
   comida: "Comida",
   transporte: "Transporte",
@@ -23,7 +18,3 @@ export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
 export const EXPENSE_CATEGORY_OPTIONS = Object.entries(
   EXPENSE_CATEGORY_LABELS
 ).map(([value, label]) => ({ value, label }));
-
-export const EXPENSE_TYPE_OPTIONS = Object.entries(EXPENSE_TYPE_LABELS).map(
-  ([value, label]) => ({ value, label })
-);

@@ -9,6 +9,7 @@ import {
   Home,
   House,
   LogOut,
+  Repeat,
   ShieldCheck,
   Users,
   Wallet,
@@ -35,6 +36,12 @@ const NAV_ITEMS: NavItem[] = [
   },
   { label: "Casas", href: "/casas", permission: "houses:read", icon: House },
   { label: "Gastos", href: "/gastos", permission: null, icon: Wallet },
+  {
+    label: "Gastos Programados",
+    href: "/gastos-programados",
+    permission: null,
+    icon: Repeat,
+  },
   { label: "Créditos", href: "/creditos", permission: null, icon: CreditCard },
 ];
 

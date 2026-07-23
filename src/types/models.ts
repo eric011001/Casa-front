@@ -16,6 +16,7 @@ export type House = {
 };
 
 export type ExpenseType = "unico" | "suscripcion" | "prestamo";
+export type ScheduledExpenseType = "suscripcion" | "prestamo";
 export type ExpenseFrequency = "semanal" | "mensual";
 export type ExpenseCategory =
   | "comida"
@@ -35,12 +36,31 @@ export type Expense = {
   amount: number;
   category: ExpenseCategory;
   type: ExpenseType;
-  frequency?: ExpenseFrequency;
+  date: string;
+  scheduledExpense: string | null;
+  installmentNumber: number | null;
+  paid: boolean;
+  paidAt: string | null;
+  creditAccount?: string | Credit | null;
+  appliedToCredit?: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ScheduledExpense = {
+  _id: string;
+  house: string;
+  createdBy: { nombre: string; apellido: string; correo: string } | string;
+  name: string;
+  amount: number;
+  category: ExpenseCategory;
+  type: ScheduledExpenseType;
+  frequency: ExpenseFrequency;
   installments?: number;
   startDate: string;
   active: boolean;
   creditAccount?: string | Credit | null;
-  appliedToCredit?: boolean;
+  lastGeneratedIndex: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -60,14 +80,19 @@ export type Credit = {
 export type ExpenseStats = {
   general: {
     totalExpenses: number;
-    activeExpenses: number;
-    inactiveExpenses: number;
+    paidExpenses: number;
+    pendingExpenses: number;
     averageAmount: number;
     highestExpense: { id: string; name: string; amount: number } | null;
   };
   byType: Record<string, { count: number; total: number }>;
   byCategory: Record<string, { count: number; total: number }>;
-  byFrequency: Record<string, { count: number; total: number }>;
+  scheduled: {
+    total: number;
+    active: number;
+    inactive: number;
+    byType: Record<string, { count: number; total: number }>;
+  };
   monthlyRecurringCost: number;
   loans: {
     count: number;
@@ -78,6 +103,8 @@ export type ExpenseStats = {
       amount: number;
       installments: number;
       elapsedInstallments: number;
+      paidInstallments: number;
+      pendingInstallments: number;
       remainingInstallments: number;
       estimatedRemainingBalance: number;
       settled: boolean;
@@ -90,6 +117,7 @@ export type ExpenseStats = {
     type: string;
     date: string;
     installmentNumber: number | null;
+    materialized: boolean;
   }[];
   monthlySeries: { month: string; total: number }[];
   byMember: {

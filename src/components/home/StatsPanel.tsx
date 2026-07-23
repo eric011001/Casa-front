@@ -111,8 +111,8 @@ export function StatsPanel({ houseId }: { houseId: string }) {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatTile
-          label="Gastos activos"
-          value={String(stats.general.activeExpenses)}
+          label="Gastos pendientes"
+          value={String(stats.general.pendingExpenses)}
           hint={`${stats.general.totalExpenses} en total`}
         />
         <StatTile
@@ -130,6 +130,11 @@ export function StatsPanel({ houseId }: { houseId: string }) {
           hint={`${stats.loans.count} préstamo${
             stats.loans.count === 1 ? "" : "s"
           }`}
+        />
+        <StatTile
+          label="Gastos programados"
+          value={String(stats.scheduled.active)}
+          hint={`${stats.scheduled.total} en total`}
         />
       </div>
 
@@ -285,6 +290,7 @@ export function StatsPanel({ houseId }: { houseId: string }) {
                     {item.installmentNumber
                       ? ` · cuota ${item.installmentNumber}`
                       : ""}
+                    {!item.materialized ? " · proyectado" : ""}
                   </p>
                 </div>
                 <span className="font-medium text-zinc-700 dark:text-zinc-300">
