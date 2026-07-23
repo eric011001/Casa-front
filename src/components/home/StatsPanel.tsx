@@ -25,7 +25,6 @@ import {
 } from "@/lib/expense-labels";
 import { CHART_COLORS } from "@/lib/chart-colors";
 import { LoadingBar } from "@/components/ui/LoadingBar";
-import { StatTile } from "./StatTile";
 import { ChartCard } from "./ChartCard";
 import type { ExpenseStats } from "@/types/models";
 
@@ -109,35 +108,6 @@ export function StatsPanel({ houseId }: { houseId: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatTile
-          label="Gastos pendientes"
-          value={String(stats.general.pendingExpenses)}
-          hint={`${stats.general.totalExpenses} en total`}
-        />
-        <StatTile
-          label="Monto promedio"
-          value={formatCurrency(stats.general.averageAmount)}
-        />
-        <StatTile
-          label="Costo recurrente mensual"
-          value={formatCurrency(stats.monthlyRecurringCost)}
-          hint="Suscripciones y préstamos activos"
-        />
-        <StatTile
-          label="Deuda de préstamos"
-          value={formatCurrency(stats.loans.totalOutstandingDebt)}
-          hint={`${stats.loans.count} préstamo${
-            stats.loans.count === 1 ? "" : "s"
-          }`}
-        />
-        <StatTile
-          label="Gastos programados"
-          value={String(stats.scheduled.active)}
-          hint={`${stats.scheduled.total} en total`}
-        />
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ChartCard title="Gasto mensual" subtitle="Últimos 6 meses">
           {monthlySeriesData.every((point) => point.total === 0) ? (
