@@ -4,8 +4,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LoadingBar } from "@/components/ui/LoadingBar";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import { StatsPanel } from "@/components/home/StatsPanel";
-import { StatCards } from "@/components/home/StatCards";
-import { ExpenseCalendar } from "@/components/home/ExpenseCalendar";
+import { CalendarStatsLayout } from "@/components/home/CalendarStatsLayout";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import type { House } from "@/types/models";
 
@@ -58,20 +57,10 @@ function HomeContent() {
         </p>
       ) : (
         <>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <ExpenseCalendar
-                key={`${selectedHouse._id}-calendar`}
-                houseId={selectedHouse._id}
-              />
-            </div>
-            <div className="lg:col-span-1 lg:min-h-0 lg:overflow-y-auto">
-              <StatCards
-                key={`${selectedHouse._id}-cards`}
-                houseId={selectedHouse._id}
-              />
-            </div>
-          </div>
+          <CalendarStatsLayout
+            key={selectedHouse._id}
+            houseId={selectedHouse._id}
+          />
           <StatsPanel key={selectedHouse._id} houseId={selectedHouse._id} />
         </>
       )}
