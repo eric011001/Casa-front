@@ -2,20 +2,23 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { CreditCard, Pencil, Plus, Trash2 } from "lucide-react";
+import { CalendarClock, CreditCard, Pencil, Plus, Trash2 } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { DataTableShell } from "@/components/ui/DataTableShell";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { StatTile } from "@/components/home/StatTile";
 import {
   CreditFormModal,
   type CreditFormValues,
 } from "@/components/credits/CreditFormModal";
+import { CreditPlanModal } from "@/components/credits/CreditPlanModal";
 import { useAsyncList } from "@/hooks/useAsyncList";
+import { useAsyncData } from "@/hooks/useAsyncData";
 import { creditsApi } from "@/services/credits.api";
 import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
-import type { Credit } from "@/types/models";
+import type { Credit, CreditStats } from "@/types/models";
 
 function creditToFormValues(credit: Credit): CreditFormValues {
   return {
@@ -37,14 +40,22 @@ function buildCreditPayload(values: CreditFormValues, isEdit: boolean) {
 }
 
 function CreditsContent() {
-  const { items: credits, loading, error, reload } = useAsyncList<Credit>(
-    creditsApi.list
-  );
+  const { items: credits, setItems: setCredits, loading, error, reload } =
+    useAsyncList<Credit>(creditsApi.list);
+  const { data: stats } = useAsyncData<CreditStats>(creditsApi.stats);
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingCredit, setEditingCredit] = useState<Credit | null>(null);
   const [deletingCredit, setDeletingCredit] = useState<Credit | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [planCredit, setPlanCredit] = useState<Credit | null>(null);
+
+  const handleCreditChange = (updated: Credit) => {
+    setCredits((prev) =>
+      prev.map((c) => (c._id === updated._id ? updated : c))
+    );
+    setPlanCredit(updated);
+  };
 
   const handleSubmit = async (values: CreditFormValues) => {
     const payload = buildCreditPayload(values, Boolean(editingCredit));
@@ -95,6 +106,33 @@ function CreditsContent() {
           Nueva tarjeta
         </Button>
       </div>
+
+      {stats && (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatTile
+            label="Deuda total"
+            value={formatCurrency(stats.general.totalDebt)}
+            hint={`${stats.general.activeCredits} tarjeta${
+              stats.general.activeCredits === 1 ? "" : "s"
+            } activa${stats.general.activeCredits === 1 ? "" : "s"}`}
+          />
+          <StatTile
+            label="Crédito disponible"
+            value={formatCurrency(stats.general.availableCredit)}
+          />
+          <StatTile
+            label="Utilización"
+            value={`${stats.general.overallUtilizationRate.toFixed(1)}%`}
+          />
+          <StatTile
+            label="Planes activos"
+            value={String(stats.plans.active)}
+            hint={`${stats.plans.onTrack} al corriente · ${stats.plans.behind} atrasado${
+              stats.plans.behind === 1 ? "" : "s"
+            }`}
+          />
+        </div>
+      )}
 
       <DataTableShell
         loading={loading}
@@ -155,6 +193,15 @@ function CreditsContent() {
                     <div className="flex items-center gap-1">
                       <button
                         type="button"
+                        onClick={() => setPlanCredit(credit)}
+                        aria-label="Plan de pago"
+                        title="Plan de pago"
+                        className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                      >
+                        <CalendarClock className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => {
                           setEditingCredit(credit);
                           setFormOpen(true);
@@ -204,6 +251,14 @@ function CreditsContent() {
         onConfirm={handleDelete}
         onCancel={() => setDeletingCredit(null)}
       />
+
+      {planCredit && (
+        <CreditPlanModal
+          credit={planCredit}
+          onClose={() => setPlanCredit(null)}
+          onCreditChange={handleCreditChange}
+        />
+      )}
     </div>
   );
 }

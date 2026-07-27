@@ -65,6 +65,22 @@ export type ScheduledExpense = {
   updatedAt: string;
 };
 
+export type DebtHistoryType =
+  | "inicial"
+  | "gasto"
+  | "interes"
+  | "pago_plan"
+  | "reversion_pago";
+
+export type DebtHistoryEntry = {
+  date: string;
+  type: DebtHistoryType;
+  amount: number;
+  balanceAfter: number;
+  expense: string | null;
+  plan: string | null;
+};
+
 export type Credit = {
   _id: string;
   user: string;
@@ -73,8 +89,81 @@ export type Credit = {
   currentDebt: number;
   limit: number;
   active: boolean;
+  debtHistory: DebtHistoryEntry[];
   createdAt: string;
   updatedAt: string;
+};
+
+export type CreditPlanDurationUnit = "semana" | "quincena" | "mes" | "anio";
+export type CreditPlanStatus = "activo" | "liquidado" | "cancelado";
+
+export type CreditPlanInstallment = {
+  number: number;
+  dueDate: string;
+  amount: number;
+  paid: boolean;
+  paidAt: string | null;
+  extra: boolean;
+};
+
+export type CreditPaymentPlan = {
+  _id: string;
+  credit: string;
+  user: string;
+  targetAmount: number;
+  initialDebt: number;
+  interestRate: number;
+  durationUnit: CreditPlanDurationUnit;
+  durationValue: number;
+  frequency: ExpenseFrequency;
+  totalInstallments: number;
+  startDate: string;
+  endDate: string;
+  status: CreditPlanStatus;
+  installments: CreditPlanInstallment[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreditStats = {
+  general: {
+    totalDebt: number;
+    totalLimit: number;
+    activeCredits: number;
+    availableCredit: number;
+    overallUtilizationRate: number;
+    highestDebtCard: { id: string; name: string; currentDebt: number } | null;
+  };
+  byCard: {
+    id: string;
+    name: string;
+    bank?: string;
+    currentDebt: number;
+    limit: number;
+    utilizationRate: number;
+    netChange30Days: number;
+    trend: "subiendo" | "bajando" | "estable";
+    plan: {
+      id: string;
+      targetAmount: number;
+      progressPercent: number;
+      expectedPercent: number;
+      onTrack: boolean;
+      remainingToPay: number;
+      remainingInstallments: number;
+    } | null;
+  }[];
+  monthlySeries: { month: string; total: number }[];
+  movementsLast30Days: Record<
+    DebtHistoryType,
+    { count: number; total: number }
+  >;
+  plans: {
+    active: number;
+    onTrack: number;
+    behind: number;
+    totalPaidViaPlans: number;
+  };
 };
 
 export type ExpenseStats = {
