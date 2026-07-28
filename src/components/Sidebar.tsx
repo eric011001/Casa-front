@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CreditCard,
@@ -10,6 +12,7 @@ import {
   House,
   LogOut,
   Repeat,
+  Settings,
   ShieldCheck,
   ShoppingCart,
   Users,
@@ -26,29 +29,60 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const NAV_ITEMS: NavItem[] = [
+type NavGroup = {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  items: NavItem[];
+};
+
+const NAV_TOP: NavItem[] = [
   { label: "Home", href: "/", permission: null, icon: Home },
-  { label: "Usuarios", href: "/usuarios", permission: "users:read", icon: Users },
+];
+
+const NAV_GROUPS: NavGroup[] = [
   {
-    label: "Roles y Permisos",
-    href: "/roles-permisos",
-    permission: ["roles:read", "permissions:read"],
-    icon: ShieldCheck,
+    key: "administracion",
+    label: "Administración",
+    icon: Settings,
+    items: [
+      { label: "Usuarios", href: "/usuarios", permission: "users:read", icon: Users },
+      {
+        label: "Roles y Permisos",
+        href: "/roles-permisos",
+        permission: ["roles:read", "permissions:read"],
+        icon: ShieldCheck,
+      },
+      { label: "Casas", href: "/casas", permission: "houses:read", icon: House },
+    ],
   },
-  { label: "Casas", href: "/casas", permission: "houses:read", icon: House },
-  { label: "Gastos", href: "/gastos", permission: null, icon: Wallet },
   {
-    label: "Gastos Programados",
-    href: "/gastos-programados",
-    permission: null,
-    icon: Repeat,
+    key: "gastos",
+    label: "Gastos",
+    icon: Wallet,
+    items: [
+      { label: "Gastos", href: "/gastos", permission: null, icon: Wallet },
+      {
+        label: "Gastos Programados",
+        href: "/gastos-programados",
+        permission: null,
+        icon: Repeat,
+      },
+      { label: "Créditos", href: "/creditos", permission: null, icon: CreditCard },
+    ],
   },
-  { label: "Créditos", href: "/creditos", permission: null, icon: CreditCard },
   {
-    label: "Lista de Compras",
-    href: "/lista-de-compras",
-    permission: null,
+    key: "carrito",
+    label: "Carrito",
     icon: ShoppingCart,
+    items: [
+      {
+        label: "Lista de Compras",
+        href: "/lista-de-compras",
+        permission: null,
+        icon: ShoppingCart,
+      },
+    ],
   },
 ];
 
@@ -71,15 +105,36 @@ export function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   const permissions = getPermissions();
   const user = getCurrentUser();
-  const items = NAV_ITEMS.filter((item) => canSee(item.permission, permissions));
+  const topItems = NAV_TOP.filter((item) => canSee(item.permission, permissions));
+  const groups = NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => canSee(item.permission, permissions)),
+  })).filter((group) => group.items.length > 0);
+
+  const isGroupOpen = (group: NavGroup) => {
+    const isActive = group.items.some((item) => pathname === item.href);
+    return openGroups[group.key] ?? isActive;
+  };
+
+  const toggleGroup = (group: NavGroup) => {
+    setOpenGroups((prev) => ({ ...prev, [group.key]: !isGroupOpen(group) }));
+  };
 
   const handleLogout = () => {
     clearAuth();
     router.push("/login");
   };
+
+  const linkClass = (active: boolean) =>
+    `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+      active
+        ? "bg-foreground text-background"
+        : "text-zinc-700 hover:bg-black/[.04] dark:text-zinc-300 dark:hover:bg-white/[.08]"
+    }`;
 
   return (
     <>
@@ -92,7 +147,7 @@ export function Sidebar({
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col justify-between border-r border-black/[.08] bg-white p-3 transition-transform duration-200 dark:border-white/[.145] dark:bg-[#0a0a0a] md:static md:z-auto md:translate-x-0 md:transition-[width] ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col justify-between overflow-y-auto border-r border-black/[.08] bg-white p-3 transition-transform duration-200 dark:border-white/[.145] dark:bg-[#0a0a0a] md:static md:z-auto md:translate-x-0 md:transition-[width] ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed ? "md:w-16" : "md:w-64"}`}
       >
@@ -130,7 +185,7 @@ export function Sidebar({
           </div>
 
           <nav className="flex flex-col gap-1">
-            {items.map((item) => {
+            {topItems.map((item) => {
               const active = pathname === item.href;
               const Icon = item.icon;
               return (
@@ -139,12 +194,8 @@ export function Sidebar({
                   href={item.href}
                   onClick={onCloseMobile}
                   title={collapsed ? item.label : undefined}
-                  className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`${linkClass(active)} ${
                     collapsed ? "md:justify-center" : ""
-                  } ${
-                    active
-                      ? "bg-foreground text-background"
-                      : "text-zinc-700 hover:bg-black/[.04] dark:text-zinc-300 dark:hover:bg-white/[.08]"
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" />
@@ -152,6 +203,61 @@ export function Sidebar({
                     {item.label}
                   </span>
                 </Link>
+              );
+            })}
+
+            {groups.map((group) => {
+              const GroupIcon = group.icon;
+              const groupActive = group.items.some(
+                (item) => pathname === item.href
+              );
+              const open = isGroupOpen(group);
+
+              return (
+                <div key={group.key}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGroup(group)}
+                    className={`w-full ${linkClass(false)} ${
+                      collapsed ? "md:hidden" : ""
+                    } ${groupActive ? "text-black dark:text-zinc-50" : ""}`}
+                  >
+                    <GroupIcon className="h-5 w-5 shrink-0" />
+                    <span className="flex-1 text-left">{group.label}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 shrink-0 transition-transform ${
+                        open ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  <div
+                    className={`mt-1 flex flex-col gap-1 ${
+                      open || collapsed ? "" : "hidden"
+                    }`}
+                  >
+                    {group.items.map((item) => {
+                      const active = pathname === item.href;
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={onCloseMobile}
+                          title={collapsed ? item.label : undefined}
+                          className={`${linkClass(active)} pl-8 ${
+                            collapsed ? "md:justify-center md:pl-3" : ""
+                          }`}
+                        >
+                          <Icon className="h-5 w-5 shrink-0" />
+                          <span className={collapsed ? "md:hidden" : ""}>
+                            {item.label}
+                          </span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </nav>
