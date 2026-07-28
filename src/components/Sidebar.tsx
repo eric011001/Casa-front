@@ -11,6 +11,7 @@ import {
   LogOut,
   Repeat,
   ShieldCheck,
+  ShoppingCart,
   Users,
   Wallet,
   X,
@@ -43,6 +44,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: Repeat,
   },
   { label: "Créditos", href: "/creditos", permission: null, icon: CreditCard },
+  {
+    label: "Lista de Compras",
+    href: "/lista-de-compras",
+    permission: null,
+    icon: ShoppingCart,
+  },
 ];
 
 function canSee(permission: string | string[] | null, granted: string[]) {

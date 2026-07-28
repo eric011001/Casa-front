@@ -232,3 +232,47 @@ export type PeriodResponse = {
   total: number;
   expenses: PeriodExpenseGroup[];
 };
+
+export type ShoppingListItemStatus = "pendiente" | "en_carrito" | "comprado";
+export type ShoppingSessionStatus = "activa" | "cerrada" | "cancelada";
+
+export type ShoppingListItem = {
+  _id: string;
+  house: string;
+  createdBy: { nombre: string; apellido: string; correo: string } | string;
+  name: string;
+  normalizedName: string;
+  quantity: number;
+  status: ShoppingListItemStatus;
+  session:
+    | string
+    | { _id: string; name: string; status: ShoppingSessionStatus }
+    | null;
+  boughtAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ShoppingListAutocompleteResult = { name: string; count: number };
+
+export type ShoppingSession = {
+  _id: string;
+  house: string;
+  createdBy: { nombre: string; apellido: string; correo: string } | string;
+  name: string;
+  status: ShoppingSessionStatus;
+  expense: string | Expense | null;
+  closedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ShoppingSessionDetail = ShoppingSession & {
+  items: ShoppingListItem[];
+};
+
+export type ShoppingSessionCloseResult = {
+  session: ShoppingSession;
+  expense: Expense;
+};

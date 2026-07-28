@@ -75,6 +75,7 @@ export function CreditPlanFormModal({
             await onSubmit(values);
             setTimeout(onClose, 0);
           } catch (err) {
+            console.log(err);
             toast.error(
               getErrorMessage(err, "No se pudo crear el plan de pago.")
             );

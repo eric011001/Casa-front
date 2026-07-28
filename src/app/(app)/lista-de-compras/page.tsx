@@ -1,0 +1,383 @@
+"use client";
+
+import { useState } from "react";
+import toast from "react-hot-toast";
+import { Pencil, Plus, ShoppingBag, Trash2 } from "lucide-react";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { Button } from "@/components/ui/Button";
+import { DataTableShell } from "@/components/ui/DataTableShell";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { LoadingBar } from "@/components/ui/LoadingBar";
+import { HouseSelector } from "@/components/houses/HouseSelector";
+import {
+  ShoppingListItemFormModal,
+  type ShoppingListItemFormValues,
+} from "@/components/shopping-list/ShoppingListItemFormModal";
+import {
+  ShoppingSessionFormModal,
+  type ShoppingSessionFormValues,
+} from "@/components/shopping-list/ShoppingSessionFormModal";
+import { ShoppingSessionDetailModal } from "@/components/shopping-list/ShoppingSessionDetailModal";
+import { useAsyncList } from "@/hooks/useAsyncList";
+import { useMyHouses } from "@/hooks/useMyHouses";
+import { shoppingListApi } from "@/services/shoppingList.api";
+import { shoppingSessionsApi } from "@/services/shoppingSessions.api";
+import { getErrorMessage } from "@/lib/http-error";
+import {
+  SHOPPING_LIST_ITEM_STATUS_LABELS,
+  SHOPPING_SESSION_STATUS_LABELS,
+} from "@/lib/shopping-list-labels";
+import type { House, ShoppingListItem, ShoppingSession } from "@/types/models";
+
+function creatorName(createdBy: ShoppingListItem["createdBy"]) {
+  return typeof createdBy === "string"
+    ? createdBy
+    : `${createdBy.nombre} ${createdBy.apellido}`;
+}
+
+function sessionNameOf(session: ShoppingListItem["session"]) {
+  if (!session) return null;
+  return typeof session === "string" ? null : session.name;
+}
+
+function formatDate(date: string) {
+  return new Date(date).toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function ShoppingListBoard({ houseId }: { houseId: string }) {
+  const {
+    items,
+    loading: itemsLoading,
+    error: itemsError,
+    reload: reloadItems,
+  } = useAsyncList<ShoppingListItem>(() => shoppingListApi.list(houseId));
+
+  const {
+    items: sessions,
+    loading: sessionsLoading,
+    error: sessionsError,
+    reload: reloadSessions,
+  } = useAsyncList<ShoppingSession>(() => shoppingSessionsApi.list(houseId));
+
+  const [itemFormOpen, setItemFormOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<ShoppingListItem | null>(null);
+  const [deletingItem, setDeletingItem] = useState<ShoppingListItem | null>(
+    null
+  );
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [sessionFormOpen, setSessionFormOpen] = useState(false);
+  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
+
+  const pendingItems = items.filter((item) => item.status === "pendiente");
+
+  const reloadAll = () => {
+    reloadItems();
+    reloadSessions();
+  };
+
+  const handleItemSubmit = async (values: ShoppingListItemFormValues) => {
+    const payload = {
+      name: values.name.trim(),
+      quantity: Number(values.quantity),
+    };
+    if (editingItem) {
+      await shoppingListApi.update(houseId, editingItem._id, payload);
+      toast.success("Producto actualizado correctamente");
+    } else {
+      await shoppingListApi.create(houseId, payload);
+      toast.success("Producto agregado a la lista");
+    }
+    reloadItems();
+  };
+
+  const handleDeleteItem = async () => {
+    if (!deletingItem) return;
+    setDeleteLoading(true);
+    try {
+      await shoppingListApi.remove(houseId, deletingItem._id);
+      toast.success("Producto eliminado correctamente");
+      setDeletingItem(null);
+      reloadItems();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "No se pudo eliminar el producto."));
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const handleSessionSubmit = async (values: ShoppingSessionFormValues) => {
+    await shoppingSessionsApi.create(houseId, { name: values.name.trim() });
+    toast.success("Sesión de compra iniciada");
+    reloadSessions();
+  };
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
+            Lista de compras
+          </h2>
+          <Button
+            onClick={() => {
+              setEditingItem(null);
+              setItemFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo producto
+          </Button>
+        </div>
+
+        <DataTableShell
+          loading={itemsLoading}
+          error={itemsError}
+          empty={items.length === 0}
+          emptyMessage="No hay productos pendientes en la lista."
+        >
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
+              <tr>
+                <th className="px-4 py-3 font-medium">Producto</th>
+                <th className="px-4 py-3 font-medium">Cantidad</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="hidden px-4 py-3 font-medium sm:table-cell">
+                  Creado por
+                </th>
+                <th className="px-4 py-3 font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
+              {items.map((item) => (
+                <tr key={item._id}>
+                  <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
+                    {item.name}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                    {item.quantity}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
+                      {SHOPPING_LIST_ITEM_STATUS_LABELS[item.status] ??
+                        item.status}
+                    </span>
+                    {sessionNameOf(item.session) && (
+                      <span className="ml-2 text-xs text-zinc-500 dark:text-zinc-400">
+                        {sessionNameOf(item.session)}
+                      </span>
+                    )}
+                  </td>
+                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
+                    {creatorName(item.createdBy)}
+                  </td>
+                  <td className="px-4 py-3">
+                    {item.status === "pendiente" && (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingItem(item);
+                            setItemFormOpen(true);
+                          }}
+                          aria-label="Editar producto"
+                          title="Editar"
+                          className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeletingItem(item)}
+                          aria-label="Eliminar producto"
+                          title="Eliminar"
+                          className="rounded-lg p-2 text-red-600 hover:bg-red-600/10 dark:text-red-400"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTableShell>
+      </div>
+
+      <div className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
+            Sesiones de compra
+          </h2>
+          <Button variant="secondary" onClick={() => setSessionFormOpen(true)}>
+            <ShoppingBag className="h-4 w-4" />
+            Nueva sesión
+          </Button>
+        </div>
+
+        <DataTableShell
+          loading={sessionsLoading}
+          error={sessionsError}
+          empty={sessions.length === 0}
+          emptyMessage="Aún no hay sesiones de compra registradas."
+        >
+          <table className="w-full min-w-[560px] text-left text-sm">
+            <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
+              <tr>
+                <th className="px-4 py-3 font-medium">Lugar</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+                <th className="hidden px-4 py-3 font-medium sm:table-cell">
+                  Creado por
+                </th>
+                <th className="hidden px-4 py-3 font-medium md:table-cell">
+                  Fecha
+                </th>
+                <th className="px-4 py-3 font-medium">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
+              {sessions.map((session) => (
+                <tr key={session._id}>
+                  <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
+                    {session.name}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
+                      {SHOPPING_SESSION_STATUS_LABELS[session.status] ??
+                        session.status}
+                    </span>
+                  </td>
+                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
+                    {creatorName(session.createdBy)}
+                  </td>
+                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 md:table-cell">
+                    {formatDate(session.createdAt)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      type="button"
+                      onClick={() => setDetailSessionId(session._id)}
+                      className="rounded-full bg-black/[.06] px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
+                    >
+                      {session.status === "activa" ? "Gestionar" : "Ver"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </DataTableShell>
+      </div>
+
+      <ShoppingListItemFormModal
+        open={itemFormOpen}
+        onClose={() => setItemFormOpen(false)}
+        onSubmit={handleItemSubmit}
+        initialValues={
+          editingItem
+            ? {
+                name: editingItem.name,
+                quantity: String(editingItem.quantity),
+              }
+            : undefined
+        }
+        houseId={houseId}
+      />
+
+      <ShoppingSessionFormModal
+        open={sessionFormOpen}
+        onClose={() => setSessionFormOpen(false)}
+        onSubmit={handleSessionSubmit}
+      />
+
+      {detailSessionId && (
+        <ShoppingSessionDetailModal
+          houseId={houseId}
+          sessionId={detailSessionId}
+          pendingItems={pendingItems}
+          onClose={() => setDetailSessionId(null)}
+          onChanged={reloadAll}
+        />
+      )}
+
+      <ConfirmDialog
+        open={Boolean(deletingItem)}
+        title="Eliminar producto"
+        description={`¿Seguro que quieres eliminar "${
+          deletingItem?.name ?? ""
+        }" de la lista?`}
+        confirmLabel="Eliminar"
+        danger
+        loading={deleteLoading}
+        onConfirm={handleDeleteItem}
+        onCancel={() => setDeletingItem(null)}
+      />
+    </div>
+  );
+}
+
+function ListaDeComprasContent() {
+  const {
+    houses,
+    loading: housesLoading,
+    error: housesError,
+    reload: reloadHouses,
+    selectedHouse,
+    selectedId,
+    selectHouse,
+  } = useMyHouses();
+
+  const handleJoined = (house: House) => {
+    reloadHouses();
+    selectHouse(house._id);
+  };
+
+  return (
+    <div className="flex flex-1 flex-col gap-4 p-6 sm:p-10">
+      <div>
+        <h1 className="text-2xl font-semibold text-black dark:text-zinc-50">
+          Lista de Compras
+        </h1>
+        <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          Agrega productos, arma sesiones de compra y registra el gasto al
+          terminar.
+        </p>
+      </div>
+
+      <HouseSelector
+        houses={houses}
+        selectedId={selectedId}
+        onSelect={selectHouse}
+        onJoined={handleJoined}
+      />
+
+      {housesLoading ? (
+        <LoadingBar />
+      ) : housesError ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {housesError}
+        </p>
+      ) : !selectedHouse ? (
+        <p className="rounded-lg border border-black/[.08] px-4 py-8 text-center text-sm text-zinc-500 dark:border-white/[.145] dark:text-zinc-400">
+          Aún no perteneces a ninguna casa. Pide un código de acceso a un
+          administrador y únete con el botón de arriba.
+        </p>
+      ) : (
+        <ShoppingListBoard key={selectedHouse._id} houseId={selectedHouse._id} />
+      )}
+    </div>
+  );
+}
+
+export default function ListaDeComprasPage() {
+  return (
+    <ProtectedRoute>
+      <ListaDeComprasContent />
+    </ProtectedRoute>
+  );
+}
