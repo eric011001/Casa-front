@@ -1,3 +1,16 @@
+import {
+  Car,
+  Clapperboard,
+  GraduationCap,
+  HeartPulse,
+  Home,
+  Package,
+  UtensilsCrossed,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
+import type { ExpenseCategory } from "@/types/models";
+
 export const EXPENSE_TYPE_LABELS: Record<string, string> = {
   unico: "Único",
   suscripcion: "Suscripción",
@@ -19,3 +32,14 @@ export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
 export const EXPENSE_CATEGORY_OPTIONS = Object.entries(
   EXPENSE_CATEGORY_LABELS
 ).map(([value, label]) => ({ value, label }));
+
+export const EXPENSE_CATEGORY_ICONS: Record<ExpenseCategory, LucideIcon> = {
+  comida: UtensilsCrossed,
+  transporte: Car,
+  renta: Home,
+  servicios: Zap,
+  entretenimiento: Clapperboard,
+  salud: HeartPulse,
+  educacion: GraduationCap,
+  otros: Package,
+};
