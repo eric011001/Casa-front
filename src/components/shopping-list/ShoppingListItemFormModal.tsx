@@ -8,15 +8,18 @@ import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { ProductAutocompleteField } from "./ProductAutocompleteField";
 import { getErrorMessage } from "@/lib/http-error";
+import type { ShoppingListAutocompleteResult } from "@/types/models";
 
 export type ShoppingListItemFormValues = {
   name: string;
   quantity: string;
+  precio: string;
 };
 
 const EMPTY_VALUES: ShoppingListItemFormValues = {
   name: "",
   quantity: "1",
+  precio: "",
 };
 
 const schema = Yup.object({
@@ -25,6 +28,10 @@ const schema = Yup.object({
     .typeError("Ingresa una cantidad válida")
     .positive("Debe ser mayor a 0")
     .required("La cantidad es requerida"),
+  precio: Yup.number()
+    .typeError("Ingresa un precio válido")
+    .min(0, "El precio no puede ser negativo")
+    .optional(),
 });
 
 export function ShoppingListItemFormModal({
@@ -64,13 +71,18 @@ export function ShoppingListItemFormModal({
           }
         }}
       >
-        {({ isSubmitting }) => (
+        {({ isSubmitting, values, setFieldValue }) => (
           <Form className="flex flex-col gap-4">
             <ProductAutocompleteField
               label="Producto"
               name="name"
               houseId={houseId}
               placeholder="Ej. Leche"
+              onSelect={(suggestion: ShoppingListAutocompleteResult) => {
+                if (!values.precio && suggestion.precio != null) {
+                  setFieldValue("precio", String(suggestion.precio));
+                }
+              }}
             />
             <TextField
               label="Cantidad"
@@ -78,6 +90,14 @@ export function ShoppingListItemFormModal({
               type="number"
               min="0"
               step="1"
+            />
+            <TextField
+              label="Precio (opcional)"
+              name="precio"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="Ej. 25.50"
             />
 
             <div className="mt-2 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

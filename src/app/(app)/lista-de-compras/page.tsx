@@ -18,6 +18,7 @@ import { useAsyncList } from "@/hooks/useAsyncList";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import { shoppingListApi } from "@/services/shoppingList.api";
 import { getErrorMessage } from "@/lib/http-error";
+import { formatCurrency } from "@/lib/format";
 import { SHOPPING_LIST_ITEM_STATUS_LABELS } from "@/lib/shopping-list-labels";
 import type { House, ShoppingListItem } from "@/types/models";
 
@@ -55,6 +56,7 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
     const payload = {
       name: values.name.trim(),
       quantity: Number(values.quantity),
+      precio: values.precio ? Number(values.precio) : undefined,
     };
     if (editingItem) {
       await shoppingListApi.update(houseId, editingItem._id, payload);
@@ -119,6 +121,7 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
               <tr>
                 <th className="px-4 py-3 font-medium">Producto</th>
                 <th className="px-4 py-3 font-medium">Cantidad</th>
+                <th className="px-4 py-3 font-medium">Precio</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
                 <th className="hidden px-4 py-3 font-medium sm:table-cell">
                   Creado por
@@ -134,6 +137,9 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
                   </td>
                   <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {item.quantity}
+                  </td>
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                    {item.precio != null ? formatCurrency(item.precio) : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
@@ -192,6 +198,8 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
             ? {
                 name: editingItem.name,
                 quantity: String(editingItem.quantity),
+                precio:
+                  editingItem.precio != null ? String(editingItem.precio) : "",
               }
             : undefined
         }

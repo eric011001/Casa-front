@@ -243,6 +243,7 @@ export type ShoppingListItem = {
   name: string;
   normalizedName: string;
   quantity: number;
+  precio?: number;
   status: ShoppingListItemStatus;
   session:
     | string
@@ -253,7 +254,11 @@ export type ShoppingListItem = {
   updatedAt: string;
 };
 
-export type ShoppingListAutocompleteResult = { name: string; count: number };
+export type ShoppingListAutocompleteResult = {
+  name: string;
+  count: number;
+  precio?: number;
+};
 
 export type ShoppingSession = {
   _id: string;

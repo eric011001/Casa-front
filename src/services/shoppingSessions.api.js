@@ -15,10 +15,11 @@ export const shoppingSessionsApi = {
     (await httpClient.post(`/houses/${houseId}/shopping-sessions`, payload))
       .data,
 
-  addItem: async (houseId, sessionId, itemId) =>
+  addItem: async (houseId, sessionId, itemId, payload = {}) =>
     (
       await httpClient.post(
-        `/houses/${houseId}/shopping-sessions/${sessionId}/items/${itemId}`
+        `/houses/${houseId}/shopping-sessions/${sessionId}/items/${itemId}`,
+        payload
       )
     ).data,
 

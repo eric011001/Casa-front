@@ -48,6 +48,7 @@ export function ShoppingSessionDetailModal({
   const [closeOpen, setCloseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(() => {
     setLoading(true);
@@ -82,10 +83,12 @@ export function ShoppingSessionDetailModal({
     };
   }, [houseId, sessionId]);
 
-  const handleAddItem = async (itemId: string) => {
+  const handleAddItem = async (itemId: string, precio?: string) => {
     setAddingId(itemId);
     try {
-      await shoppingSessionsApi.addItem(houseId, sessionId, itemId);
+      const trimmed = precio?.trim();
+      const payload = trimmed ? { precio: Number(trimmed) } : {};
+      await shoppingSessionsApi.addItem(houseId, sessionId, itemId, payload);
       load();
       onChanged();
     } catch (err) {
@@ -143,6 +146,11 @@ export function ShoppingSessionDetailModal({
   const isActive = session?.status === "activa";
   const cartItems = session?.items.filter((i) => i.status === "en_carrito") ?? [];
   const boughtItems = session?.items.filter((i) => i.status === "comprado") ?? [];
+  const cartTotal = cartItems.reduce(
+    (sum, item) => sum + (item.precio ?? 0) * item.quantity,
+    0
+  );
+  const cartHasMissingPrice = cartItems.some((item) => item.precio == null);
 
   return (
     <>
@@ -195,9 +203,15 @@ export function ShoppingSessionDetailModal({
 
               {isActive && (
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                    Carrito
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                      Carrito
+                    </p>
+                    <p className="text-sm font-medium text-black dark:text-zinc-50">
+                      {cartHasMissingPrice ? "Aprox. " : ""}
+                      {formatCurrency(cartTotal)}
+                    </p>
+                  </div>
                   {cartItems.length === 0 ? (
                     <p className="text-sm text-zinc-500 dark:text-zinc-400">
                       Aún no has agregado productos al carrito.
@@ -215,16 +229,23 @@ export function ShoppingSessionDetailModal({
                               ×{item.quantity}
                             </span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(item._id)}
-                            disabled={removingId === item._id}
-                            aria-label="Quitar del carrito"
-                            title="Quitar del carrito"
-                            className="rounded-lg p-1.5 text-red-600 hover:bg-red-600/10 disabled:opacity-50 dark:text-red-400"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-3">
+                            <span className="text-zinc-500 dark:text-zinc-400">
+                              {item.precio != null
+                                ? formatCurrency(item.precio * item.quantity)
+                                : "Sin precio"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveItem(item._id)}
+                              disabled={removingId === item._id}
+                              aria-label="Quitar del carrito"
+                              title="Quitar del carrito"
+                              className="rounded-lg p-1.5 text-red-600 hover:bg-red-600/10 disabled:opacity-50 dark:text-red-400"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>
@@ -242,7 +263,7 @@ export function ShoppingSessionDetailModal({
                       {pendingItems.map((item) => (
                         <li
                           key={item._id}
-                          className="flex items-center justify-between rounded-lg border border-black/[.08] px-3 py-2 text-sm dark:border-white/[.145]"
+                          className="flex items-center justify-between gap-2 rounded-lg border border-black/[.08] px-3 py-2 text-sm dark:border-white/[.145]"
                         >
                           <span className="text-zinc-700 dark:text-zinc-300">
                             {item.name}{" "}
@@ -250,16 +271,41 @@ export function ShoppingSessionDetailModal({
                               ×{item.quantity}
                             </span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleAddItem(item._id)}
-                            disabled={addingId === item._id}
-                            aria-label="Agregar al carrito"
-                            title="Agregar al carrito"
-                            className="rounded-lg p-1.5 text-green-600 hover:bg-green-600/10 disabled:opacity-50 dark:text-green-400"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {item.precio != null ? (
+                              <span className="text-zinc-500 dark:text-zinc-400">
+                                {formatCurrency(item.precio)}
+                              </span>
+                            ) : (
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                placeholder="Precio"
+                                aria-label={`Precio de ${item.name}`}
+                                value={priceDrafts[item._id] ?? ""}
+                                onChange={(e) =>
+                                  setPriceDrafts((prev) => ({
+                                    ...prev,
+                                    [item._id]: e.target.value,
+                                  }))
+                                }
+                                className="w-20 rounded-lg border border-black/[.08] bg-transparent px-2 py-1 text-sm text-black outline-none focus:border-black/[.3] dark:border-white/[.145] dark:text-zinc-50 dark:focus:border-white/[.3]"
+                              />
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleAddItem(item._id, priceDrafts[item._id])
+                              }
+                              disabled={addingId === item._id}
+                              aria-label="Agregar al carrito"
+                              title="Agregar al carrito"
+                              className="rounded-lg p-1.5 text-green-600 hover:bg-green-600/10 disabled:opacity-50 dark:text-green-400"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
                         </li>
                       ))}
                     </ul>

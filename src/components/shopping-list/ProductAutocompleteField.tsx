@@ -10,11 +10,13 @@ export function ProductAutocompleteField({
   name,
   houseId,
   placeholder,
+  onSelect,
 }: {
   label: string;
   name: string;
   houseId: string;
   placeholder?: string;
+  onSelect?: (suggestion: ShoppingListAutocompleteResult) => void;
 }) {
   const [field, meta] = useField(name);
   const { setFieldValue } = useFormikContext();
@@ -102,6 +104,7 @@ export function ProductAutocompleteField({
                 onClick={() => {
                   setFieldValue(name, s.name);
                   setOpen(false);
+                  onSelect?.(s);
                 }}
                 className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-zinc-700 hover:bg-black/[.04] dark:text-zinc-300 dark:hover:bg-white/[.08]"
               >
