@@ -13,21 +13,13 @@ import {
   ShoppingListItemFormModal,
   type ShoppingListItemFormValues,
 } from "@/components/shopping-list/ShoppingListItemFormModal";
-import {
-  ShoppingSessionFormModal,
-  type ShoppingSessionFormValues,
-} from "@/components/shopping-list/ShoppingSessionFormModal";
-import { ShoppingSessionDetailModal } from "@/components/shopping-list/ShoppingSessionDetailModal";
+import { ShoppingSessionsModal } from "@/components/shopping-list/ShoppingSessionsModal";
 import { useAsyncList } from "@/hooks/useAsyncList";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import { shoppingListApi } from "@/services/shoppingList.api";
-import { shoppingSessionsApi } from "@/services/shoppingSessions.api";
 import { getErrorMessage } from "@/lib/http-error";
-import {
-  SHOPPING_LIST_ITEM_STATUS_LABELS,
-  SHOPPING_SESSION_STATUS_LABELS,
-} from "@/lib/shopping-list-labels";
-import type { House, ShoppingListItem, ShoppingSession } from "@/types/models";
+import { SHOPPING_LIST_ITEM_STATUS_LABELS } from "@/lib/shopping-list-labels";
+import type { House, ShoppingListItem } from "@/types/models";
 
 function creatorName(createdBy: ShoppingListItem["createdBy"]) {
   return typeof createdBy === "string"
@@ -40,14 +32,6 @@ function sessionNameOf(session: ShoppingListItem["session"]) {
   return typeof session === "string" ? null : session.name;
 }
 
-function formatDate(date: string) {
-  return new Date(date).toLocaleDateString("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-}
-
 function ShoppingListBoard({ houseId }: { houseId: string }) {
   const {
     items,
@@ -56,13 +40,6 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
     reload: reloadItems,
   } = useAsyncList<ShoppingListItem>(() => shoppingListApi.list(houseId));
 
-  const {
-    items: sessions,
-    loading: sessionsLoading,
-    error: sessionsError,
-    reload: reloadSessions,
-  } = useAsyncList<ShoppingSession>(() => shoppingSessionsApi.list(houseId));
-
   const [itemFormOpen, setItemFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingListItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<ShoppingListItem | null>(
@@ -70,15 +47,9 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const [sessionFormOpen, setSessionFormOpen] = useState(false);
-  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
+  const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
   const pendingItems = items.filter((item) => item.status === "pendiente");
-
-  const reloadAll = () => {
-    reloadItems();
-    reloadSessions();
-  };
 
   const handleItemSubmit = async (values: ShoppingListItemFormValues) => {
     const payload = {
@@ -110,12 +81,6 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
     }
   };
 
-  const handleSessionSubmit = async (values: ShoppingSessionFormValues) => {
-    await shoppingSessionsApi.create(houseId, { name: values.name.trim() });
-    toast.success("Sesión de compra iniciada");
-    reloadSessions();
-  };
-
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
@@ -123,15 +88,24 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
           <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
             Lista de compras
           </h2>
-          <Button
-            onClick={() => {
-              setEditingItem(null);
-              setItemFormOpen(true);
-            }}
-          >
-            <Plus className="h-4 w-4" />
-            Nuevo producto
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setSessionsModalOpen(true)}
+            >
+              <ShoppingBag className="h-4 w-4" />
+              Sesiones de compra
+            </Button>
+            <Button
+              onClick={() => {
+                setEditingItem(null);
+                setItemFormOpen(true);
+              }}
+            >
+              <Plus className="h-4 w-4" />
+              Nuevo producto
+            </Button>
+          </div>
         </div>
 
         <DataTableShell
@@ -209,71 +183,6 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
         </DataTableShell>
       </div>
 
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
-            Sesiones de compra
-          </h2>
-          <Button variant="secondary" onClick={() => setSessionFormOpen(true)}>
-            <ShoppingBag className="h-4 w-4" />
-            Nueva sesión
-          </Button>
-        </div>
-
-        <DataTableShell
-          loading={sessionsLoading}
-          error={sessionsError}
-          empty={sessions.length === 0}
-          emptyMessage="Aún no hay sesiones de compra registradas."
-        >
-          <table className="w-full min-w-[560px] text-left text-sm">
-            <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
-              <tr>
-                <th className="px-4 py-3 font-medium">Lugar</th>
-                <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="hidden px-4 py-3 font-medium sm:table-cell">
-                  Creado por
-                </th>
-                <th className="hidden px-4 py-3 font-medium md:table-cell">
-                  Fecha
-                </th>
-                <th className="px-4 py-3 font-medium">Acciones</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-              {sessions.map((session) => (
-                <tr key={session._id}>
-                  <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
-                    {session.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
-                      {SHOPPING_SESSION_STATUS_LABELS[session.status] ??
-                        session.status}
-                    </span>
-                  </td>
-                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
-                    {creatorName(session.createdBy)}
-                  </td>
-                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 md:table-cell">
-                    {formatDate(session.createdAt)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setDetailSessionId(session._id)}
-                      className="rounded-full bg-black/[.06] px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
-                    >
-                      {session.status === "activa" ? "Gestionar" : "Ver"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </DataTableShell>
-      </div>
-
       <ShoppingListItemFormModal
         open={itemFormOpen}
         onClose={() => setItemFormOpen(false)}
@@ -289,19 +198,12 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
         houseId={houseId}
       />
 
-      <ShoppingSessionFormModal
-        open={sessionFormOpen}
-        onClose={() => setSessionFormOpen(false)}
-        onSubmit={handleSessionSubmit}
-      />
-
-      {detailSessionId && (
-        <ShoppingSessionDetailModal
+      {sessionsModalOpen && (
+        <ShoppingSessionsModal
           houseId={houseId}
-          sessionId={detailSessionId}
           pendingItems={pendingItems}
-          onClose={() => setDetailSessionId(null)}
-          onChanged={reloadAll}
+          onClose={() => setSessionsModalOpen(false)}
+          onItemsChanged={reloadItems}
         />
       )}
 
