@@ -47,4 +47,11 @@ export const scheduledExpensesApi = {
         `/houses/${houseId}/scheduled-expenses/${id}/deactivate`
       )
     ).data,
+
+  payNextOccurrence: async (houseId, id) =>
+    (
+      await httpClient.patch(
+        `/houses/${houseId}/scheduled-expenses/${id}/pay-next`
+      )
+    ).data,
 };

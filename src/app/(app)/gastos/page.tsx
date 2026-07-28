@@ -67,12 +67,19 @@ type PeriodRow = {
   materialized: boolean;
   paid: boolean;
   expense: Expense | null;
+  // Solo para ocurrencias todavía no generadas: el gasto programado del que salen, y si esta
+  // es justo la SIGUIENTE cuota pendiente de generar (única que se puede pagar por adelantado;
+  // ver payNextOccurrence en el backend, que siempre paga lastGeneratedIndex+1 sin importar
+  // qué fila se haya clickeado).
+  scheduledExpenseId: string | null;
+  canPayInAdvance: boolean;
 };
 
 function buildRows(data: PeriodResponse | null): PeriodRow[] {
   if (!data) return [];
   const rows: PeriodRow[] = [];
   for (const group of data.expenses) {
+    const scheduledExpense = "frequency" in group.expense ? group.expense : null;
     for (const occurrence of group.occurrences) {
       const expense = occurrence.materialized ? (group.expense as Expense) : null;
       rows.push({
@@ -85,6 +92,11 @@ function buildRows(data: PeriodResponse | null): PeriodRow[] {
         materialized: occurrence.materialized,
         paid: expense ? expense.paid : false,
         expense,
+        scheduledExpenseId: scheduledExpense ? scheduledExpense._id : null,
+        canPayInAdvance: Boolean(
+          scheduledExpense &&
+            occurrence.installmentNumber === scheduledExpense.lastGeneratedIndex + 2
+        ),
       });
     }
   }
@@ -231,6 +243,7 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [payingScheduledId, setPayingScheduledId] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -250,16 +263,20 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
     };
   }, [houseId, granularity, anchorDate]);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
-    return expensesApi
-      .period(houseId, { granularity, date: anchorDate })
-      .then((data: PeriodResponse) => setPeriodData(data))
-      .catch((err: unknown) =>
-        setError(getErrorMessage(err, "No se pudo cargar el periodo."))
-      )
-      .finally(() => setLoading(false));
+    try {
+      const data: PeriodResponse = await expensesApi.period(houseId, {
+        granularity,
+        date: anchorDate,
+      });
+      setPeriodData(data);
+    } catch (err) {
+      setError(getErrorMessage(err, "No se pudo cargar el periodo."));
+    } finally {
+      setLoading(false);
+    }
   }, [houseId, granularity, anchorDate]);
 
   const rows = useMemo(() => buildRows(periodData), [periodData]);
@@ -344,6 +361,22 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
       toast.error(getErrorMessage(err, "No se pudo aplicar el gasto a la tarjeta."));
     } finally {
       setApplyingId(null);
+    }
+  };
+
+  const handlePayInAdvance = async (row: PeriodRow) => {
+    if (!row.scheduledExpenseId) return;
+    setPayingScheduledId(row.scheduledExpenseId);
+    try {
+      await scheduledExpensesApi.payNextOccurrence(houseId, row.scheduledExpenseId);
+      toast.success(`"${row.name}" marcado como pagado por adelantado`);
+      load();
+    } catch (err) {
+      toast.error(
+        getErrorMessage(err, "No se pudo marcar como pagado por adelantado.")
+      );
+    } finally {
+      setPayingScheduledId(null);
     }
   };
 
@@ -537,6 +570,16 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
                   <td className="px-4 py-3">
                     {row.expense ? (
                       <ActionMenu items={buildActions(row.expense)} />
+                    ) : row.canPayInAdvance ? (
+                      <button
+                        type="button"
+                        onClick={() => handlePayInAdvance(row)}
+                        disabled={payingScheduledId === row.scheduledExpenseId}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] disabled:opacity-50 dark:bg-white/[.08] dark:text-zinc-300"
+                      >
+                        <Power className="h-3.5 w-3.5" />
+                        Pagar antes
+                      </button>
                     ) : (
                       <span className="text-xs text-zinc-400">Automático</span>
                     )}
