@@ -44,7 +44,7 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
   const [itemFormOpen, setItemFormOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<ShoppingListItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<ShoppingListItem | null>(
-    null
+    null,
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
 
@@ -86,19 +86,21 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
             Lista de compras
           </h2>
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row">
             <Button
               variant="secondary"
+              className="w-full sm:w-auto"
               onClick={() => setSessionsModalOpen(true)}
             >
               <ShoppingBag className="h-4 w-4" />
               Sesiones de compra
             </Button>
             <Button
+              className="w-full sm:w-auto"
               onClick={() => {
                 setEditingItem(null);
                 setItemFormOpen(true);
@@ -116,16 +118,75 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
           empty={items.length === 0}
           emptyMessage="No hay productos pendientes en la lista."
         >
-          <table className="w-full min-w-[560px] text-left text-sm">
+          <div className="divide-y divide-black/[.06] dark:divide-white/[.08] sm:hidden">
+            {items.map((item) => (
+              <div key={item._id} className="flex flex-col gap-2 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-medium text-black dark:text-zinc-50">
+                    {item.name}
+                  </p>
+                  {item.status === "pendiente" && (
+                    <div className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingItem(item);
+                          setItemFormOpen(true);
+                        }}
+                        aria-label="Editar producto"
+                        title="Editar"
+                        className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDeletingItem(item)}
+                        aria-label="Eliminar producto"
+                        title="Eliminar"
+                        className="rounded-lg p-2 text-red-600 hover:bg-red-600/10 dark:text-red-400"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-zinc-600 dark:text-zinc-400">
+                  <span>Cantidad: {item.quantity}</span>
+                  <span>
+                    Precio:{" "}
+                    {item.precio != null ? formatCurrency(item.precio) : "—"}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
+                    {SHOPPING_LIST_ITEM_STATUS_LABELS[item.status] ??
+                      item.status}
+                  </span>
+                  {sessionNameOf(item.session) && (
+                    <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                      {sessionNameOf(item.session)}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Creado por {creatorName(item.createdBy)}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <table className="hidden w-full min-w-[560px] text-left text-sm sm:table">
             <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
               <tr>
                 <th className="px-4 py-3 font-medium">Producto</th>
                 <th className="px-4 py-3 font-medium">Cantidad</th>
                 <th className="px-4 py-3 font-medium">Precio</th>
                 <th className="px-4 py-3 font-medium">Estado</th>
-                <th className="hidden px-4 py-3 font-medium sm:table-cell">
-                  Creado por
-                </th>
+                <th className="px-4 py-3 font-medium">Creado por</th>
                 <th className="px-4 py-3 font-medium">Acciones</th>
               </tr>
             </thead>
@@ -152,7 +213,7 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
                       </span>
                     )}
                   </td>
-                  <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
+                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                     {creatorName(item.createdBy)}
                   </td>
                   <td className="px-4 py-3">
@@ -278,7 +339,10 @@ function ListaDeComprasContent() {
           administrador y únete con el botón de arriba.
         </p>
       ) : (
-        <ShoppingListBoard key={selectedHouse._id} houseId={selectedHouse._id} />
+        <ShoppingListBoard
+          key={selectedHouse._id}
+          houseId={selectedHouse._id}
+        />
       )}
     </div>
   );
