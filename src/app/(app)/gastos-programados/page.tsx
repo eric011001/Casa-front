@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import {
-  CreditCard,
+  Banknote,
   History,
   Pencil,
   Plus,
@@ -13,9 +13,11 @@ import {
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
-import { DataTableShell } from "@/components/ui/DataTableShell";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingBar } from "@/components/ui/LoadingBar";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { Skeleton } from "@/components/ui/Skeleton";
+import { StatCard } from "@/components/ui/StatCard";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import {
   ScheduledExpenseFormModal,
@@ -23,12 +25,17 @@ import {
 } from "@/components/scheduled-expenses/ScheduledExpenseFormModal";
 import { ScheduledExpenseOccurrencesModal } from "@/components/scheduled-expenses/ScheduledExpenseOccurrencesModal";
 import { useAsyncList } from "@/hooks/useAsyncList";
+import { useAsyncData } from "@/hooks/useAsyncData";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import { scheduledExpensesApi } from "@/services/scheduledExpenses.api";
 import { creditsApi } from "@/services/credits.api";
+import { expensesApi } from "@/services/expenses.api";
 import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
-import { EXPENSE_CATEGORY_LABELS } from "@/lib/expense-labels";
+import {
+  EXPENSE_CATEGORY_ICONS,
+  EXPENSE_CATEGORY_LABELS,
+} from "@/lib/expense-labels";
 import {
   EXPENSE_FREQUENCY_LABELS,
   SCHEDULED_EXPENSE_TYPE_LABELS,
@@ -37,30 +44,239 @@ import {
   buildScheduledExpensePayload,
   scheduledExpenseToFormValues,
 } from "@/lib/scheduled-expense-form";
-import type { Credit, House, ScheduledExpense } from "@/types/models";
+import type {
+  Credit,
+  ExpenseFrequency,
+  House,
+  PeriodResponse,
+  ScheduledExpense,
+} from "@/types/models";
 
-function creditIdOf(creditAccount: ScheduledExpense["creditAccount"]) {
-  if (!creditAccount) return null;
-  return typeof creditAccount === "string" ? creditAccount : creditAccount._id;
+const MONTHLY_MULTIPLIER: Record<ExpenseFrequency, number> = {
+  semanal: 52 / 12,
+  quincenal: 2,
+  mensual: 1,
+};
+
+type NextPayment = { date: string; installmentNumber: number | null };
+
+function addMonthsIso(iso: string, months: number) {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + months, 1))
+    .toISOString()
+    .slice(0, 10);
 }
 
-function creditNameOf(
-  creditAccount: ScheduledExpense["creditAccount"],
-  credits: Credit[]
-) {
-  const id = creditIdOf(creditAccount);
-  if (!id) return null;
-  if (typeof creditAccount === "object" && creditAccount) return creditAccount.name;
-  return credits.find((c) => c._id === id)?.name ?? "Tarjeta";
+function isScheduledExpenseGroup(
+  expense: PeriodResponse["expenses"][number]["expense"],
+): expense is ScheduledExpense {
+  return "frequency" in expense;
 }
 
-function creatorName(createdBy: ScheduledExpense["createdBy"]) {
-  return typeof createdBy === "string"
-    ? createdBy
-    : `${createdBy.nombre} ${createdBy.apellido}`;
+function buildNextPaymentMap(periods: (PeriodResponse | null)[]) {
+  const map = new Map<string, NextPayment>();
+  const todayIso = new Date().toISOString().slice(0, 10);
+  for (const period of periods) {
+    if (!period) continue;
+    for (const group of period.expenses) {
+      if (!isScheduledExpenseGroup(group.expense)) continue;
+      for (const occurrence of group.occurrences) {
+        const dateIso = occurrence.date.slice(0, 10);
+        if (dateIso < todayIso) continue;
+        const existing = map.get(group.expense._id);
+        if (!existing || dateIso < existing.date) {
+          map.set(group.expense._id, {
+            date: dateIso,
+            installmentNumber: occurrence.installmentNumber,
+          });
+        }
+      }
+    }
+  }
+  return map;
 }
 
-function ScheduledExpensesTable({
+function LoanProgress({ paid, total }: { paid: number; total: number }) {
+  const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-black/[.08] dark:bg-white/[.1]">
+        <div
+          className="h-full rounded-full bg-foreground"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        {paid} de {total} cuotas
+      </p>
+    </div>
+  );
+}
+
+function ScheduledExpenseCardSkeleton() {
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-black/[.08] p-4 dark:border-white/[.145] lg:flex-row lg:items-center lg:gap-6">
+      <div className="flex items-start gap-3 lg:w-56 lg:shrink-0">
+        <Skeleton className="h-9 w-9 shrink-0 rounded-full" />
+        <div className="flex flex-col gap-1.5">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-20" />
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5 lg:flex-1">
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-3 w-40" />
+      </div>
+      <div className="lg:w-32 lg:shrink-0">
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="mt-1.5 h-4 w-20" />
+      </div>
+      <div className="flex items-center justify-between gap-3 lg:w-auto lg:shrink-0">
+        <Skeleton className="h-6 w-16 rounded-full" />
+        <Skeleton className="h-8 w-8 rounded-lg" />
+      </div>
+    </div>
+  );
+}
+
+function ScheduledExpenseCard({
+  scheduledExpense,
+  nextPayment,
+  onViewHistory,
+  onEdit,
+  onToggleActive,
+  onPayInAdvance,
+  onDelete,
+  togglingId,
+  payingId,
+}: {
+  scheduledExpense: ScheduledExpense;
+  nextPayment?: NextPayment;
+  onViewHistory: () => void;
+  onEdit: () => void;
+  onToggleActive: () => void;
+  onPayInAdvance: () => void;
+  onDelete: () => void;
+  togglingId: string | null;
+  payingId: string | null;
+}) {
+  const CategoryIcon = EXPENSE_CATEGORY_ICONS[scheduledExpense.category];
+  const categoryLabel =
+    EXPENSE_CATEGORY_LABELS[scheduledExpense.category] ??
+    scheduledExpense.category;
+  const isLoan = scheduledExpense.type === "prestamo";
+  const loanFinished =
+    isLoan &&
+    scheduledExpense.installments != null &&
+    scheduledExpense.lastGeneratedIndex >= scheduledExpense.installments;
+
+  const actions: ActionMenuItem[] = [
+    { label: "Ver historial", icon: History, onClick: onViewHistory },
+    { label: "Editar", icon: Pencil, onClick: onEdit },
+    {
+      label: "Pagar por adelantado",
+      icon: Banknote,
+      disabled:
+        !scheduledExpense.active ||
+        loanFinished ||
+        payingId === scheduledExpense._id,
+      onClick: onPayInAdvance,
+    },
+    scheduledExpense.active
+      ? {
+          label: "Desactivar",
+          icon: PowerOff,
+          disabled: togglingId === scheduledExpense._id,
+          onClick: onToggleActive,
+        }
+      : {
+          label: "Activar",
+          icon: Power,
+          disabled: togglingId === scheduledExpense._id,
+          onClick: onToggleActive,
+        },
+    { label: "Eliminar", icon: Trash2, danger: true, onClick: onDelete },
+  ];
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border border-black/[.08] p-4 dark:border-white/[.145] lg:flex-row lg:items-center lg:gap-6">
+      <div className="flex items-start gap-3 lg:w-56 lg:shrink-0">
+        <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/[.05] text-zinc-600 dark:bg-white/[.08] dark:text-zinc-300">
+          <CategoryIcon className="h-4 w-4" />
+        </span>
+        <div>
+          <p className="font-bold text-black dark:text-zinc-50">
+            {scheduledExpense.name}
+          </p>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            {categoryLabel}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-0.5 lg:flex-1">
+        <p className="font-medium text-black dark:text-zinc-50">
+          {formatCurrency(scheduledExpense.amount)}
+        </p>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          {SCHEDULED_EXPENSE_TYPE_LABELS[scheduledExpense.type] ??
+            scheduledExpense.type}
+          {" · "}
+          {EXPENSE_FREQUENCY_LABELS[scheduledExpense.frequency]}
+          {isLoan && scheduledExpense.installments
+            ? ` · ${scheduledExpense.installments} cuotas`
+            : ""}
+        </p>
+        {isLoan && (
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Inicio:{" "}
+            {new Date(scheduledExpense.startDate).toLocaleDateString("es-MX", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            })}
+          </p>
+        )}
+      </div>
+
+      {isLoan && scheduledExpense.installments ? (
+        <div className="lg:w-40 lg:shrink-0">
+          <LoanProgress
+            paid={scheduledExpense.lastGeneratedIndex}
+            total={scheduledExpense.installments}
+          />
+        </div>
+      ) : null}
+
+      <div className="lg:w-32 lg:shrink-0">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">Próximo pago</p>
+        <p className="text-sm font-medium text-black dark:text-zinc-50">
+          {nextPayment
+            ? new Date(`${nextPayment.date}T00:00:00.000Z`).toLocaleDateString(
+                "es-MX",
+                { day: "2-digit", month: "short", timeZone: "UTC" },
+              )
+            : "—"}
+        </p>
+      </div>
+
+      <div className="flex items-center justify-between gap-3 lg:w-auto lg:shrink-0 lg:justify-end">
+        {scheduledExpense.active ? (
+          <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-400">
+            Activo
+          </span>
+        ) : (
+          <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
+            Inactivo
+          </span>
+        )}
+        <ActionMenu items={actions} />
+      </div>
+    </div>
+  );
+}
+
+function ScheduledExpensesList({
   houseId,
   filters,
   credits,
@@ -79,26 +295,54 @@ function ScheduledExpensesTable({
     error,
     reload,
   } = useAsyncList<ScheduledExpense>(() =>
-    scheduledExpensesApi.list(houseId, apiFilters)
+    scheduledExpensesApi.list(houseId, apiFilters),
+  );
+
+  const { data: currentPeriod } = useAsyncData<PeriodResponse>(() =>
+    expensesApi.period(houseId, { granularity: "mensual" }),
+  );
+  const { data: nextPeriod } = useAsyncData<PeriodResponse>(() =>
+    expensesApi.period(houseId, {
+      granularity: "mensual",
+      date: addMonthsIso(new Date().toISOString().slice(0, 10), 1),
+    }),
+  );
+  const nextPaymentByScheduledId = useMemo(
+    () => buildNextPaymentMap([currentPeriod, nextPeriod]),
+    [currentPeriod, nextPeriod],
   );
 
   const [formOpen, setFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<ScheduledExpense | null>(
-    null
+    null,
   );
-  const [deletingExpense, setDeletingExpense] = useState<ScheduledExpense | null>(
-    null
-  );
+  const [deletingExpense, setDeletingExpense] =
+    useState<ScheduledExpense | null>(null);
   const [viewingExpense, setViewingExpense] = useState<ScheduledExpense | null>(
-    null
+    null,
   );
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  const activeCount = scheduledExpenses.filter((se) => se.active).length;
+  const inactiveCount = scheduledExpenses.length - activeCount;
+  const monthlyRecurringCost = scheduledExpenses
+    .filter((se) => se.active)
+    .reduce((sum, se) => sum + se.amount * MONTHLY_MULTIPLIER[se.frequency], 0);
+  const pendingLoanDebt = scheduledExpenses
+    .filter((se) => se.type === "prestamo" && se.installments)
+    .reduce(
+      (sum, se) =>
+        sum +
+        Math.max(0, (se.installments ?? 0) - se.lastGeneratedIndex) * se.amount,
+      0,
+    );
 
   const handleSubmit = async (values: ScheduledExpenseFormValues) => {
     const payload = buildScheduledExpensePayload(
       values,
-      Boolean(editingExpense)
+      Boolean(editingExpense),
     );
     if (editingExpense) {
       await scheduledExpensesApi.update(houseId, editingExpense._id, payload);
@@ -120,7 +364,7 @@ function ScheduledExpensesTable({
       reload();
     } catch (err) {
       toast.error(
-        getErrorMessage(err, "No se pudo eliminar el gasto programado.")
+        getErrorMessage(err, "No se pudo eliminar el gasto programado."),
       );
     } finally {
       setDeleteLoading(false);
@@ -140,10 +384,29 @@ function ScheduledExpensesTable({
       reload();
     } catch (err) {
       toast.error(
-        getErrorMessage(err, "No se pudo cambiar el estado del gasto programado.")
+        getErrorMessage(
+          err,
+          "No se pudo cambiar el estado del gasto programado.",
+        ),
       );
     } finally {
       setTogglingId(null);
+    }
+  };
+
+  const handlePayInAdvance = async (scheduledExpense: ScheduledExpense) => {
+    setPayingId(scheduledExpense._id);
+    try {
+      await scheduledExpensesApi.payNextOccurrence(
+        houseId,
+        scheduledExpense._id,
+      );
+      toast.success(`"${scheduledExpense.name}" pagado por adelantado`);
+      reload();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "No se pudo pagar por adelantado."));
+    } finally {
+      setPayingId(null);
     }
   };
 
@@ -162,155 +425,75 @@ function ScheduledExpensesTable({
         </Button>
       </div>
 
-      <DataTableShell
-        loading={loading}
-        error={error}
-        empty={scheduledExpenses.length === 0}
-        emptyMessage="No hay gastos programados registrados con estos filtros."
-      >
-        <table className="w-full min-w-[820px] text-left text-sm">
-          <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
-            <tr>
-              <th className="px-4 py-3 font-medium">Nombre</th>
-              <th className="px-4 py-3 font-medium">Categoría</th>
-              <th className="px-4 py-3 font-medium">Monto</th>
-              <th className="px-4 py-3 font-medium">Tipo</th>
-              <th className="hidden px-4 py-3 font-medium sm:table-cell">
-                Inicio
-              </th>
-              <th className="hidden px-4 py-3 font-medium md:table-cell">
-                Creado por
-              </th>
-              <th className="hidden px-4 py-3 font-medium lg:table-cell">
-                Tarjeta
-              </th>
-              <th className="px-4 py-3 font-medium">Estado</th>
-              <th className="px-4 py-3 font-medium">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-            {scheduledExpenses.map((scheduledExpense) => (
-              <tr key={scheduledExpense._id}>
-                <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
-                  {scheduledExpense.name}
-                </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                  {EXPENSE_CATEGORY_LABELS[scheduledExpense.category] ??
-                    scheduledExpense.category}
-                </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                  {formatCurrency(scheduledExpense.amount)}
-                </td>
-                <td className="px-4 py-3">
-                  <p className="text-zinc-700 dark:text-zinc-300">
-                    {SCHEDULED_EXPENSE_TYPE_LABELS[scheduledExpense.type] ??
-                      scheduledExpense.type}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {EXPENSE_FREQUENCY_LABELS[scheduledExpense.frequency]}
-                    {scheduledExpense.type === "prestamo"
-                      ? ` · ${scheduledExpense.installments} cuotas`
-                      : ""}
-                  </p>
-                </td>
-                <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
-                  {new Date(scheduledExpense.startDate).toLocaleDateString(
-                    "es-MX",
-                    { day: "2-digit", month: "short", year: "numeric" }
-                  )}
-                </td>
-                <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 md:table-cell">
-                  {creatorName(scheduledExpense.createdBy)}
-                </td>
-                <td className="hidden px-4 py-3 lg:table-cell">
-                  {scheduledExpense.creditAccount ? (
-                    <div className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4 shrink-0 text-zinc-400" />
-                      <span className="text-zinc-600 dark:text-zinc-400">
-                        {creditNameOf(scheduledExpense.creditAccount, credits)}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-zinc-400">—</span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  {scheduledExpense.active ? (
-                    <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-400">
-                      Activo
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-                      Inactivo
-                    </span>
-                  )}
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => setViewingExpense(scheduledExpense)}
-                      aria-label="Ver historial"
-                      title="Ver historial"
-                      className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
-                    >
-                      <History className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingExpense(scheduledExpense);
-                        setFormOpen(true);
-                      }}
-                      aria-label="Editar gasto programado"
-                      title="Editar"
-                      className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleToggleActive(scheduledExpense)}
-                      disabled={togglingId === scheduledExpense._id}
-                      aria-label={
-                        scheduledExpense.active ? "Desactivar" : "Activar"
-                      }
-                      title={scheduledExpense.active ? "Desactivar" : "Activar"}
-                      className={`rounded-lg p-2 disabled:opacity-50 ${
-                        scheduledExpense.active
-                          ? "text-amber-600 hover:bg-amber-600/10 dark:text-amber-400"
-                          : "text-green-600 hover:bg-green-600/10 dark:text-green-400"
-                      }`}
-                    >
-                      {scheduledExpense.active ? (
-                        <PowerOff className="h-4 w-4" />
-                      ) : (
-                        <Power className="h-4 w-4" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeletingExpense(scheduledExpense)}
-                      aria-label="Eliminar gasto programado"
-                      title="Eliminar"
-                      className="rounded-lg p-2 text-red-600 hover:bg-red-600/10 dark:text-red-400"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </DataTableShell>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard
+          label="Activos"
+          value={String(activeCount)}
+          tone="green"
+          loading={loading}
+        />
+        <StatCard
+          label="Inactivos"
+          value={String(inactiveCount)}
+          loading={loading}
+        />
+        <StatCard
+          label="Costo recurrente mensual"
+          value={formatCurrency(monthlyRecurringCost)}
+          loading={loading}
+        />
+        <StatCard
+          label="Deuda pendiente en préstamos"
+          value={formatCurrency(pendingLoanDebt)}
+          tone="amber"
+          loading={loading}
+        />
+      </div>
+
+      {error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </p>
+      ) : loading ? (
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <ScheduledExpenseCardSkeleton key={index} />
+          ))}
+        </div>
+      ) : scheduledExpenses.length === 0 ? (
+        <p className="rounded-lg border border-black/[.08] px-4 py-8 text-center text-sm text-zinc-500 dark:border-white/[.145] dark:text-zinc-400">
+          No hay gastos programados registrados con estos filtros.
+        </p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {scheduledExpenses.map((scheduledExpense) => (
+            <ScheduledExpenseCard
+              key={scheduledExpense._id}
+              scheduledExpense={scheduledExpense}
+              nextPayment={nextPaymentByScheduledId.get(scheduledExpense._id)}
+              onViewHistory={() => setViewingExpense(scheduledExpense)}
+              onEdit={() => {
+                setEditingExpense(scheduledExpense);
+                setFormOpen(true);
+              }}
+              onToggleActive={() => handleToggleActive(scheduledExpense)}
+              onPayInAdvance={() => handlePayInAdvance(scheduledExpense)}
+              onDelete={() => setDeletingExpense(scheduledExpense)}
+              togglingId={togglingId}
+              payingId={payingId}
+            />
+          ))}
+        </div>
+      )}
 
       <ScheduledExpenseFormModal
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}
         initialValues={
-          editingExpense ? scheduledExpenseToFormValues(editingExpense) : undefined
+          editingExpense
+            ? scheduledExpenseToFormValues(editingExpense)
+            : undefined
         }
         credits={credits}
       />
@@ -366,8 +549,8 @@ function GastosProgramadosContent() {
           Gastos Programados
         </h1>
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
-          Administra las suscripciones, servicios y préstamos recurrentes de
-          las casas a las que perteneces.
+          Administra las suscripciones, servicios y préstamos recurrentes de las
+          casas a las que perteneces.
         </p>
       </div>
 
@@ -405,7 +588,7 @@ function GastosProgramadosContent() {
                   <option key={value} value={value}>
                     {label}
                   </option>
-                )
+                ),
               )}
             </select>
             <select
@@ -421,7 +604,7 @@ function GastosProgramadosContent() {
             </select>
           </div>
 
-          <ScheduledExpensesTable
+          <ScheduledExpensesList
             key={`${selectedHouse._id}:${filters.type}:${filters.active}`}
             houseId={selectedHouse._id}
             filters={filters}

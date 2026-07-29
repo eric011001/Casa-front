@@ -21,6 +21,7 @@ import { LoadingBar } from "@/components/ui/LoadingBar";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Pagination } from "@/components/ui/Pagination";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { StatCard } from "@/components/ui/StatCard";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import {
   ExpenseFormModal,
@@ -149,37 +150,6 @@ function formatPeriodLabel(
 function creditIdOf(creditAccount: Expense["creditAccount"]) {
   if (!creditAccount) return null;
   return typeof creditAccount === "string" ? creditAccount : creditAccount._id;
-}
-
-function StatCard({
-  label,
-  value,
-  tone = "default",
-  loading = false,
-}: {
-  label: string;
-  value: string;
-  tone?: "default" | "green" | "amber";
-  loading?: boolean;
-}) {
-  const toneClass =
-    tone === "green"
-      ? "text-green-700 dark:text-green-400"
-      : tone === "amber"
-        ? "text-amber-700 dark:text-amber-400"
-        : "text-black dark:text-zinc-50";
-  return (
-    <div className="rounded-xl border border-black/[.08] p-4 dark:border-white/[.145]">
-      <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-        {label}
-      </p>
-      {loading ? (
-        <Skeleton className="mt-1.5 h-6 w-24" />
-      ) : (
-        <p className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
-      )}
-    </div>
-  );
 }
 
 function StatusBadge({ row }: { row: PeriodRow }) {
