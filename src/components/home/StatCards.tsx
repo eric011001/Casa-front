@@ -3,7 +3,6 @@
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { expensesApi } from "@/services/expenses.api";
 import { formatCurrency } from "@/lib/format";
-import { LoadingBar } from "@/components/ui/LoadingBar";
 import { StatTile } from "./StatTile";
 import type { ExpenseStats } from "@/types/models";
 
@@ -11,8 +10,6 @@ export function StatCards({ houseId }: { houseId: string }) {
   const { data: stats, loading, error } = useAsyncData<ExpenseStats>(() =>
     expensesApi.stats(houseId)
   );
-
-  if (loading) return <LoadingBar />;
 
   if (error) {
     return (
@@ -22,35 +19,47 @@ export function StatCards({ houseId }: { houseId: string }) {
     );
   }
 
-  if (!stats) return null;
-
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-1">
       <StatTile
         label="Gastos pendientes"
-        value={String(stats.general.pendingExpenses)}
-        hint={`${stats.general.totalExpenses} en total`}
+        value={stats ? String(stats.general.pendingExpenses) : undefined}
+        hint={stats ? `${stats.general.totalExpenses} en total` : undefined}
+        loading={loading}
+        showHintSkeleton
       />
       <StatTile
         label="Monto promedio"
-        value={formatCurrency(stats.general.averageAmount)}
+        value={stats ? formatCurrency(stats.general.averageAmount) : undefined}
+        loading={loading}
       />
       <StatTile
         label="Costo recurrente mensual"
-        value={formatCurrency(stats.monthlyRecurringCost)}
+        value={
+          stats ? formatCurrency(stats.monthlyRecurringCost) : undefined
+        }
         hint="Suscripciones y préstamos activos"
+        loading={loading}
       />
       <StatTile
         label="Deuda de préstamos"
-        value={formatCurrency(stats.loans.totalOutstandingDebt)}
-        hint={`${stats.loans.count} préstamo${
-          stats.loans.count === 1 ? "" : "s"
-        }`}
+        value={
+          stats ? formatCurrency(stats.loans.totalOutstandingDebt) : undefined
+        }
+        hint={
+          stats
+            ? `${stats.loans.count} préstamo${stats.loans.count === 1 ? "" : "s"}`
+            : undefined
+        }
+        loading={loading}
+        showHintSkeleton
       />
       <StatTile
         label="Gastos programados"
-        value={String(stats.scheduled.active)}
-        hint={`${stats.scheduled.total} en total`}
+        value={stats ? String(stats.scheduled.active) : undefined}
+        hint={stats ? `${stats.scheduled.total} en total` : undefined}
+        loading={loading}
+        showHintSkeleton
       />
     </div>
   );

@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
 import { expensesApi } from "@/services/expenses.api";
 import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
-import { LoadingBar } from "@/components/ui/LoadingBar";
 import { Button } from "@/components/ui/Button";
 import { ChartCard } from "./ChartCard";
 import type { Expense, PeriodResponse } from "@/types/models";
@@ -43,13 +42,15 @@ const STATUS_DOT_CLASSES: Record<DayStatus, string> = {
 const pad = (n: number) => String(n).padStart(2, "0");
 
 function isScheduledExpense(
-  expense: PeriodResponse["expenses"][number]["expense"]
+  expense: PeriodResponse["expenses"][number]["expense"],
 ): expense is Exclude<PeriodResponse["expenses"][number]["expense"], Expense> {
   return "frequency" in expense;
 }
 
 export function ExpenseCalendar({ houseId }: { houseId: string }) {
-  const [anchorDate, setAnchorDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [anchorDate, setAnchorDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [data, setData] = useState<PeriodResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -74,7 +75,8 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
         if (!cancelled) setData(result);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(getErrorMessage(err, "No se pudo cargar el calendario."));
+        if (!cancelled)
+          setError(getErrorMessage(err, "No se pudo cargar el calendario."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -95,11 +97,16 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
   const goToday = () => setAnchorDate(new Date().toISOString().slice(0, 10));
 
   const calendar = useMemo(() => {
-    const reference = data ? new Date(data.period.from) : new Date();
+    // El marco del mes (días, encabezado) se deriva de anchorDate para que se muestre de
+    // inmediato al cambiar de mes; los gastos (itemsByDay) llegan después con el fetch. Si
+    // `data` todavía corresponde al mes anterior, sus fechas no calzan con las dateKey de
+    // este mes y simplemente no se muestran, sin necesidad de limpiar `data` explícitamente.
+    const reference = new Date(`${anchorDate}T00:00:00.000Z`);
     const year = reference.getUTCFullYear();
     const month = reference.getUTCMonth();
     const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-    const firstWeekday = (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
+    const firstWeekday =
+      (new Date(Date.UTC(year, month, 1)).getUTCDay() + 6) % 7;
 
     const itemsByDay = new Map<string, DayItem[]>();
     if (data) {
@@ -143,17 +150,7 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
     const todayKey = new Date().toISOString().slice(0, 10);
 
     return { weeks, itemsByDay, monthLabel, todayKey, year, month };
-  }, [data]);
-
-  if (loading) return <LoadingBar />;
-
-  if (error) {
-    return (
-      <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
-        {error}
-      </p>
-    );
-  }
+  }, [anchorDate, data]);
 
   const { weeks, itemsByDay, monthLabel, todayKey, year, month } = calendar;
 
@@ -179,106 +176,146 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
           >
             <ChevronRight className="h-4 w-4" />
           </button>
-          <Button variant="secondary" className="h-8 px-3 text-xs" onClick={goToday}>
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-xs"
+            onClick={goToday}
+          >
             Hoy
           </Button>
         </div>
       }
     >
-      <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-zinc-500 dark:text-zinc-400">
-        {WEEKDAY_LABELS.map((label) => (
-          <div key={label}>{label}</div>
-        ))}
-      </div>
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {weeks.map((week, weekIndex) =>
-          week.map((day, dayIndex) => {
-            if (day === null) {
-              return <div key={`empty-${weekIndex}-${dayIndex}`} />;
+      {error ? (
+        <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {error}
+        </p>
+      ) : (
+        <div className="relative">
+          <div
+            className={
+              loading
+                ? "pointer-events-none opacity-40 transition-opacity"
+                : "transition-opacity"
             }
+          >
+            <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-zinc-500 dark:text-zinc-400">
+              {WEEKDAY_LABELS.map((label) => (
+                <div key={label}>{label}</div>
+              ))}
+            </div>
+            <div className="mt-1 grid grid-cols-7 gap-1">
+              {weeks.map((week, weekIndex) =>
+                week.map((day, dayIndex) => {
+                  if (day === null) {
+                    return <div key={`empty-${weekIndex}-${dayIndex}`} />;
+                  }
 
-            const dateKey = `${year}-${pad(month + 1)}-${pad(day)}`;
-            const items = itemsByDay.get(dateKey) ?? [];
-            const dayTotal = items.reduce((sum, item) => sum + item.amount, 0);
-            const isToday = dateKey === todayKey;
-            const dominantStatus: DayStatus | null = items.some(
-              (item) => item.status === "pendiente"
-            )
-              ? "pendiente"
-              : items.some((item) => item.status === "proyectado")
-                ? "proyectado"
-                : items.length
-                  ? "pagado"
-                  : null;
+                  const dateKey = `${year}-${pad(month + 1)}-${pad(day)}`;
+                  const items = itemsByDay.get(dateKey) ?? [];
+                  const dayTotal = items.reduce(
+                    (sum, item) => sum + item.amount,
+                    0,
+                  );
+                  const isToday = dateKey === todayKey;
+                  const dominantStatus: DayStatus | null = items.some(
+                    (item) => item.status === "pendiente",
+                  )
+                    ? "pendiente"
+                    : items.some((item) => item.status === "proyectado")
+                      ? "proyectado"
+                      : items.length
+                        ? "pagado"
+                        : null;
 
-            return (
-              <div
-                key={dateKey}
-                className={`group relative flex min-h-16 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs ${
-                  isToday
-                    ? "border-black/30 dark:border-white/40"
-                    : "border-black/[.06] dark:border-white/[.08]"
-                }`}
-              >
-                <span
-                  className={`font-medium ${
-                    isToday
-                      ? "text-black dark:text-zinc-50"
-                      : "text-zinc-600 dark:text-zinc-400"
-                  }`}
-                >
-                  {day}
-                </span>
-
-                {items.length > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
-                    <span
-                      className={`h-1.5 w-1.5 rounded-full ${
-                        dominantStatus ? STATUS_DOT_CLASSES[dominantStatus] : ""
+                  return (
+                    <div
+                      key={dateKey}
+                      className={`group relative flex min-h-16 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs ${
+                        isToday
+                          ? "border-black/30 dark:border-white/40"
+                          : "border-black/[.06] dark:border-white/[.08]"
                       }`}
-                    />
-                    {formatCurrency(dayTotal)}
-                  </span>
-                )}
+                    >
+                      <span
+                        className={`font-medium ${
+                          isToday
+                            ? "text-black dark:text-zinc-50"
+                            : "text-zinc-600 dark:text-zinc-400"
+                        }`}
+                      >
+                        {day}
+                      </span>
 
-                {items.length > 0 && (
-                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-black/[.08] bg-white p-3 text-left opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 dark:border-white/[.145] dark:bg-[#111]">
-                    <p className="mb-2 text-xs font-semibold text-black dark:text-zinc-50">
-                      {new Date(Date.UTC(year, month, day)).toLocaleDateString(
-                        "es-MX",
-                        { day: "2-digit", month: "long", timeZone: "UTC" }
+                      {items.length > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-zinc-700 dark:text-zinc-300">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              dominantStatus
+                                ? STATUS_DOT_CLASSES[dominantStatus]
+                                : ""
+                            }`}
+                          />
+                          {formatCurrency(dayTotal)}
+                        </span>
                       )}
-                    </p>
-                    <ul className="flex flex-col gap-2">
-                      {items.map((item) => (
-                        <li key={item.key} className="flex flex-col gap-0.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-medium text-black dark:text-zinc-50">
-                              {item.name}
-                            </span>
-                            <span className="text-zinc-700 dark:text-zinc-300">
-                              {formatCurrency(item.amount)}
-                            </span>
-                          </div>
-                          <span className="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT_CLASSES[item.status]}`}
-                            />
-                            {STATUS_LABELS[item.status]}
-                            {item.installmentNumber
-                              ? ` · cuota ${item.installmentNumber}`
-                              : ""}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            );
-          })
-        )}
-      </div>
+
+                      {items.length > 0 && (
+                        <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-black/[.08] bg-white p-3 text-left opacity-0 shadow-lg transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 dark:border-white/[.145] dark:bg-[#111]">
+                          <p className="mb-2 text-xs font-semibold text-black dark:text-zinc-50">
+                            {new Date(
+                              Date.UTC(year, month, day),
+                            ).toLocaleDateString("es-MX", {
+                              day: "2-digit",
+                              month: "long",
+                              timeZone: "UTC",
+                            })}
+                          </p>
+                          <ul className="flex flex-col gap-2">
+                            {items.map((item) => (
+                              <li
+                                key={item.key}
+                                className="flex flex-col gap-0.5"
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <span className="font-medium text-black dark:text-zinc-50">
+                                    {item.name}
+                                  </span>
+                                  <span className="text-zinc-700 dark:text-zinc-300">
+                                    {formatCurrency(item.amount)}
+                                  </span>
+                                </div>
+                                <span className="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
+                                  <span
+                                    className={`h-1.5 w-1.5 rounded-full ${STATUS_DOT_CLASSES[item.status]}`}
+                                  />
+                                  {STATUS_LABELS[item.status]}
+                                  {item.installmentNumber
+                                    ? ` · cuota ${item.installmentNumber}`
+                                    : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  );
+                }),
+              )}
+            </div>
+          </div>
+
+          {loading && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+              <Loader2 className="h-6 w-6 animate-spin text-zinc-500 dark:text-zinc-400" />
+              <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                Cargando…
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </ChartCard>
   );
 }
