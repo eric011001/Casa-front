@@ -1,3 +1,5 @@
+import { Skeleton } from "@/components/ui/Skeleton";
+
 export function StatTile({
   label,
   value,
@@ -17,7 +19,7 @@ export function StatTile({
         {label}
       </p>
       {loading || value === undefined ? (
-        <div className="h-7 w-20 animate-pulse rounded bg-black/[.08] dark:bg-white/[.1]" />
+        <Skeleton className="h-7 w-20" />
       ) : (
         <p className="text-2xl font-semibold text-black dark:text-zinc-50">
           {value}
@@ -26,7 +28,7 @@ export function StatTile({
       {hint ? (
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{hint}</p>
       ) : showHintSkeleton && loading ? (
-        <div className="h-3 w-24 animate-pulse rounded bg-black/[.06] dark:bg-white/[.08]" />
+        <Skeleton className="h-3 w-24" />
       ) : null}
     </div>
   );

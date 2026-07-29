@@ -20,6 +20,7 @@ import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingBar } from "@/components/ui/LoadingBar";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Pagination } from "@/components/ui/Pagination";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import {
   ExpenseFormModal,
@@ -82,9 +83,12 @@ function buildRows(data: PeriodResponse | null): PeriodRow[] {
   if (!data) return [];
   const rows: PeriodRow[] = [];
   for (const group of data.expenses) {
-    const scheduledExpense = "frequency" in group.expense ? group.expense : null;
+    const scheduledExpense =
+      "frequency" in group.expense ? group.expense : null;
     for (const occurrence of group.occurrences) {
-      const expense = occurrence.materialized ? (group.expense as Expense) : null;
+      const expense = occurrence.materialized
+        ? (group.expense as Expense)
+        : null;
       rows.push({
         key: `${group.expense._id}-${occurrence.installmentNumber ?? "u"}-${occurrence.date}`,
         name: group.expense.name,
@@ -98,7 +102,8 @@ function buildRows(data: PeriodResponse | null): PeriodRow[] {
         scheduledExpenseId: scheduledExpense ? scheduledExpense._id : null,
         canPayInAdvance: Boolean(
           scheduledExpense &&
-            occurrence.installmentNumber === scheduledExpense.lastGeneratedIndex + 2
+          occurrence.installmentNumber ===
+            scheduledExpense.lastGeneratedIndex + 2,
         ),
       });
     }
@@ -112,7 +117,11 @@ function shiftIsoDate(iso: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-function formatPeriodLabel(granularity: Granularity, fromIso: string, toIso: string) {
+function formatPeriodLabel(
+  granularity: Granularity,
+  fromIso: string,
+  toIso: string,
+) {
   const from = new Date(fromIso);
   const to = new Date(toIso);
   if (granularity === "mensual") {
@@ -124,10 +133,16 @@ function formatPeriodLabel(granularity: Granularity, fromIso: string, toIso: str
     return label.charAt(0).toUpperCase() + label.slice(1);
   }
   const fmtShort = (d: Date) =>
-    d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", timeZone: "UTC" });
-  const fmtDay = (d: Date) => d.toLocaleDateString("es-MX", { day: "2-digit", timeZone: "UTC" });
+    d.toLocaleDateString("es-MX", {
+      day: "2-digit",
+      month: "short",
+      timeZone: "UTC",
+    });
+  const fmtDay = (d: Date) =>
+    d.toLocaleDateString("es-MX", { day: "2-digit", timeZone: "UTC" });
   const sameMonth =
-    from.getUTCMonth() === to.getUTCMonth() && from.getUTCFullYear() === to.getUTCFullYear();
+    from.getUTCMonth() === to.getUTCMonth() &&
+    from.getUTCFullYear() === to.getUTCFullYear();
   return `${sameMonth ? fmtDay(from) : fmtShort(from)} – ${fmtShort(to)}, ${to.getUTCFullYear()}`;
 }
 
@@ -140,10 +155,12 @@ function StatCard({
   label,
   value,
   tone = "default",
+  loading = false,
 }: {
   label: string;
   value: string;
   tone?: "default" | "green" | "amber";
+  loading?: boolean;
 }) {
   const toneClass =
     tone === "green"
@@ -156,7 +173,11 @@ function StatCard({
       <p className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </p>
-      <p className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
+      {loading ? (
+        <Skeleton className="mt-1.5 h-6 w-24" />
+      ) : (
+        <p className={`mt-1 text-lg font-semibold ${toneClass}`}>{value}</p>
+      )}
     </div>
   );
 }
@@ -207,9 +228,17 @@ function CategoryLegend() {
   );
 }
 
-function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[] }) {
+function ExpensesTable({
+  houseId,
+  credits,
+}: {
+  houseId: string;
+  credits: Credit[];
+}) {
   const [granularity, setGranularity] = useState<Granularity>("mensual");
-  const [anchorDate, setAnchorDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [anchorDate, setAnchorDate] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [periodData, setPeriodData] = useState<PeriodResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -227,11 +256,11 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   }
 
   const { items: scheduledExpenses } = useAsyncList<ScheduledExpense>(() =>
-    scheduledExpensesApi.list(houseId)
+    scheduledExpensesApi.list(houseId),
   );
   const scheduledExpenseNameById = useMemo(
     () => new Map(scheduledExpenses.map((se) => [se._id, se.name])),
-    [scheduledExpenses]
+    [scheduledExpenses],
   );
 
   const [filters, setFilters] = useState<{ type: string; paid: PaidFilter }>({
@@ -246,7 +275,9 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
-  const [payingScheduledId, setPayingScheduledId] = useState<string | null>(null);
+  const [payingScheduledId, setPayingScheduledId] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -256,7 +287,8 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
         if (!cancelled) setPeriodData(data);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(getErrorMessage(err, "No se pudo cargar el periodo."));
+        if (!cancelled)
+          setError(getErrorMessage(err, "No se pudo cargar el periodo."));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -287,7 +319,8 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   const filteredRows = rows.filter((row) => {
     if (filters.type && row.type !== filters.type) return false;
     if (filters.paid === "true" && !row.paid) return false;
-    if (filters.paid === "false" && (row.paid || !row.materialized)) return false;
+    if (filters.paid === "false" && (row.paid || !row.materialized))
+      return false;
     if (filters.paid === "proyectado" && row.materialized) return false;
     return true;
   });
@@ -309,11 +342,13 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   }
   const pagedRows = filteredRows.slice(
     (clampedPage - 1) * ROWS_PER_PAGE,
-    clampedPage * ROWS_PER_PAGE
+    clampedPage * ROWS_PER_PAGE,
   );
 
   const totalPeriod = rows.reduce((sum, r) => sum + r.amount, 0);
-  const paidTotal = rows.filter((r) => r.paid).reduce((sum, r) => sum + r.amount, 0);
+  const paidTotal = rows
+    .filter((r) => r.paid)
+    .reduce((sum, r) => sum + r.amount, 0);
   const pendingTotal = totalPeriod - paidTotal;
   const projectedCount = rows.filter((r) => !r.materialized).length;
 
@@ -366,7 +401,9 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
       }
       load();
     } catch (err) {
-      toast.error(getErrorMessage(err, "No se pudo cambiar el estado del gasto."));
+      toast.error(
+        getErrorMessage(err, "No se pudo cambiar el estado del gasto."),
+      );
     } finally {
       setTogglingId(null);
     }
@@ -381,7 +418,9 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
       toast.success("Gasto aplicado a la tarjeta correctamente");
       load();
     } catch (err) {
-      toast.error(getErrorMessage(err, "No se pudo aplicar el gasto a la tarjeta."));
+      toast.error(
+        getErrorMessage(err, "No se pudo aplicar el gasto a la tarjeta."),
+      );
     } finally {
       setApplyingId(null);
     }
@@ -391,12 +430,15 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
     if (!row.scheduledExpenseId) return;
     setPayingScheduledId(row.scheduledExpenseId);
     try {
-      await scheduledExpensesApi.payNextOccurrence(houseId, row.scheduledExpenseId);
+      await scheduledExpensesApi.payNextOccurrence(
+        houseId,
+        row.scheduledExpenseId,
+      );
       toast.success(`"${row.name}" marcado como pagado por adelantado`);
       load();
     } catch (err) {
       toast.error(
-        getErrorMessage(err, "No se pudo marcar como pagado por adelantado.")
+        getErrorMessage(err, "No se pudo marcar como pagado por adelantado."),
       );
     } finally {
       setPayingScheduledId(null);
@@ -406,7 +448,11 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
   const buildActions = (expense: Expense): ActionMenuItem[] => {
     const creditId = creditIdOf(expense.creditAccount);
     const items: ActionMenuItem[] = [
-      { label: "Ver detalle completo", icon: Eye, onClick: () => setDetailExpense(expense) },
+      {
+        label: "Ver detalle completo",
+        icon: Eye,
+        onClick: () => setDetailExpense(expense),
+      },
       {
         label: "Editar",
         icon: Pencil,
@@ -477,7 +523,11 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
           </button>
           <span className="min-w-[11rem] text-center text-sm font-medium text-black dark:text-zinc-50">
             {periodData
-              ? formatPeriodLabel(granularity, periodData.period.from, periodData.period.to)
+              ? formatPeriodLabel(
+                  granularity,
+                  periodData.period.from,
+                  periodData.period.to,
+                )
               : "…"}
           </span>
           <button
@@ -495,17 +545,37 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Total del periodo" value={formatCurrency(totalPeriod)} />
-        <StatCard label="Pagado" value={formatCurrency(paidTotal)} tone="green" />
-        <StatCard label="Por pagar" value={formatCurrency(pendingTotal)} tone="amber" />
-        <StatCard label="Próximos (sin generar)" value={String(projectedCount)} />
+        <StatCard
+          label="Total del periodo"
+          value={formatCurrency(totalPeriod)}
+          loading={loading}
+        />
+        <StatCard
+          label="Pagado"
+          value={formatCurrency(paidTotal)}
+          tone="green"
+          loading={loading}
+        />
+        <StatCard
+          label="Por pagar"
+          value={formatCurrency(pendingTotal)}
+          tone="amber"
+          loading={loading}
+        />
+        <StatCard
+          label="Próximos (sin generar)"
+          value={String(projectedCount)}
+          loading={loading}
+        />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row">
           <select
             value={filters.type}
-            onChange={(e) => setFilters((f) => ({ ...f, type: e.target.value }))}
+            onChange={(e) =>
+              setFilters((f) => ({ ...f, type: e.target.value }))
+            }
             className="w-full rounded-lg border border-black/[.08] bg-transparent px-3 py-2 text-sm text-black outline-none focus:border-black/[.3] dark:border-white/[.145] dark:text-zinc-50 dark:focus:border-white/[.3] sm:w-auto"
           >
             <option value="">Todos los tipos</option>
@@ -559,62 +629,94 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
             </tr>
           </thead>
           <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-            {pagedRows.map((row) => {
-              const CategoryIcon = EXPENSE_CATEGORY_ICONS[row.category];
-              const categoryLabel = EXPENSE_CATEGORY_LABELS[row.category] ?? row.category;
-              return (
-                <tr key={row.key}>
-                  <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
-                    {row.name}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      title={categoryLabel}
-                      aria-label={categoryLabel}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/[.05] text-zinc-600 dark:bg-white/[.08] dark:text-zinc-300"
-                    >
-                      <CategoryIcon className="h-4 w-4" />
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                    {formatCurrency(row.amount)}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
-                    {new Date(row.date).toLocaleDateString("es-MX", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      timeZone: "UTC",
-                    })}
-                  </td>
-                  <td className="px-4 py-3">
-                    <StatusBadge row={row} />
-                  </td>
-                  <td className="px-4 py-3">
-                    {row.expense ? (
-                      <ActionMenu items={buildActions(row.expense)} />
-                    ) : row.canPayInAdvance ? (
-                      <button
-                        type="button"
-                        onClick={() => handlePayInAdvance(row)}
-                        disabled={payingScheduledId === row.scheduledExpenseId}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] disabled:opacity-50 dark:bg-white/[.08] dark:text-zinc-300"
-                      >
-                        <Power className="h-3.5 w-3.5" />
-                        Pagar antes
-                      </button>
-                    ) : (
-                      <span className="text-xs text-zinc-400">Automático</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
+            {loading
+              ? Array.from({ length: ROWS_PER_PAGE }).map((_, index) => (
+                  <tr key={`skeleton-${index}`}>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-4 w-32" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-8 w-8 rounded-full" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-4 w-16" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-4 w-20" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-6 w-20 rounded-full" />
+                    </td>
+                    <td className="px-4 py-3">
+                      <Skeleton className="h-4 w-16" />
+                    </td>
+                  </tr>
+                ))
+              : pagedRows.map((row) => {
+                  const CategoryIcon = EXPENSE_CATEGORY_ICONS[row.category];
+                  const categoryLabel =
+                    EXPENSE_CATEGORY_LABELS[row.category] ?? row.category;
+                  return (
+                    <tr key={row.key}>
+                      <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
+                        {row.name}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          title={categoryLabel}
+                          aria-label={categoryLabel}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/[.05] text-zinc-600 dark:bg-white/[.08] dark:text-zinc-300"
+                        >
+                          <CategoryIcon className="h-4 w-4" />
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                        {formatCurrency(row.amount)}
+                      </td>
+                      <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
+                        {new Date(row.date).toLocaleDateString("es-MX", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          timeZone: "UTC",
+                        })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge row={row} />
+                      </td>
+                      <td className="px-4 py-3">
+                        {row.expense ? (
+                          <ActionMenu items={buildActions(row.expense)} />
+                        ) : row.canPayInAdvance ? (
+                          <button
+                            type="button"
+                            onClick={() => handlePayInAdvance(row)}
+                            disabled={
+                              payingScheduledId === row.scheduledExpenseId
+                            }
+                            className="inline-flex items-center gap-1.5 rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] disabled:opacity-50 dark:bg-white/[.08] dark:text-zinc-300"
+                          >
+                            <Power className="h-3.5 w-3.5" />
+                            Pagar antes
+                          </button>
+                        ) : (
+                          <span className="text-xs text-zinc-400">
+                            Automático
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
           </tbody>
         </table>
       </DataTableShell>
 
-      <Pagination page={clampedPage} pageCount={pageCount} onPageChange={setPage} />
+      <Pagination
+        page={clampedPage}
+        pageCount={pageCount}
+        onPageChange={setPage}
+      />
 
       <CategoryLegend />
 
@@ -622,7 +724,9 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
         open={formOpen}
         onClose={() => setFormOpen(false)}
         onSubmit={handleSubmit}
-        initialValues={editingExpense ? expenseToFormValues(editingExpense) : undefined}
+        initialValues={
+          editingExpense ? expenseToFormValues(editingExpense) : undefined
+        }
         credits={credits}
         creditLocked={Boolean(editingExpense?.appliedToCredit)}
       />
@@ -634,7 +738,8 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
         credits={credits}
         scheduledExpenseName={
           detailExpense?.scheduledExpense
-            ? scheduledExpenseNameById.get(detailExpense.scheduledExpense) ?? null
+            ? (scheduledExpenseNameById.get(detailExpense.scheduledExpense) ??
+              null)
             : null
         }
       />
@@ -704,7 +809,11 @@ function GastosContent() {
           administrador y únete con el botón de arriba.
         </p>
       ) : (
-        <ExpensesTable key={selectedHouse._id} houseId={selectedHouse._id} credits={credits} />
+        <ExpensesTable
+          key={selectedHouse._id}
+          houseId={selectedHouse._id}
+          credits={credits}
+        />
       )}
     </div>
   );
