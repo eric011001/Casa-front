@@ -1,12 +1,20 @@
 "use client";
 
+import { useState } from "react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { LoadingBar } from "@/components/ui/LoadingBar";
+import { Tabs } from "@/components/ui/Tabs";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import { StatsPanel } from "@/components/home/StatsPanel";
 import { CalendarStatsLayout } from "@/components/home/CalendarStatsLayout";
+import { UpcomingExpensesList } from "@/components/home/UpcomingExpensesList";
 import { useMyHouses } from "@/hooks/useMyHouses";
 import type { House } from "@/types/models";
+
+const HOME_TABS = [
+  { key: "calendario", label: "Calendario" },
+  { key: "proximos", label: "Próximos" },
+];
 
 function HomeContent() {
   const {
@@ -18,6 +26,8 @@ function HomeContent() {
     selectedId,
     selectHouse,
   } = useMyHouses();
+
+  const [activeTab, setActiveTab] = useState("calendario");
 
   const handleJoined = (house: House) => {
     reload();
@@ -57,10 +67,20 @@ function HomeContent() {
         </p>
       ) : (
         <>
-          <CalendarStatsLayout
-            key={selectedHouse._id}
-            houseId={selectedHouse._id}
-          />
+          <Tabs tabs={HOME_TABS} activeKey={activeTab} onChange={setActiveTab} />
+
+          {activeTab === "calendario" ? (
+            <CalendarStatsLayout
+              key={selectedHouse._id}
+              houseId={selectedHouse._id}
+            />
+          ) : (
+            <UpcomingExpensesList
+              key={selectedHouse._id}
+              houseId={selectedHouse._id}
+            />
+          )}
+
           <StatsPanel key={selectedHouse._id} houseId={selectedHouse._id} />
         </>
       )}

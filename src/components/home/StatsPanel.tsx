@@ -36,9 +36,7 @@ function CurrencyTooltip({ active, payload, label }: TooltipContentProps) {
   return (
     <div className="rounded-lg border border-black/[.08] bg-white px-3 py-2 text-xs shadow-md dark:border-white/[.145] dark:bg-[#111]">
       {label && (
-        <p className="mb-1 font-medium text-black dark:text-zinc-50">
-          {label}
-        </p>
+        <p className="mb-1 font-medium text-black dark:text-zinc-50">{label}</p>
       )}
       {payload.map((entry) => (
         <p
@@ -61,9 +59,11 @@ function EmptyChartMessage() {
 }
 
 export function StatsPanel({ houseId }: { houseId: string }) {
-  const { data: stats, loading, error } = useAsyncData<ExpenseStats>(() =>
-    expensesApi.stats(houseId)
-  );
+  const {
+    data: stats,
+    loading,
+    error,
+  } = useAsyncData<ExpenseStats>(() => expensesApi.stats(houseId));
 
   if (loading) return <LoadingBar />;
 
@@ -107,170 +107,140 @@ export function StatsPanel({ houseId }: { houseId: string }) {
     .sort((a, b) => b.total - a.total);
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <ChartCard title="Gasto mensual" subtitle="Últimos 6 meses">
-          {monthlySeriesData.every((point) => point.total === 0) ? (
-            <EmptyChartMessage />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <LineChart data={monthlySeriesData}>
-                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                <XAxis
-                  dataKey="month"
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  tickLine={false}
-                />
-                <YAxis
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  width={70}
-                  tickFormatter={(value) => formatCurrency(Number(value))}
-                />
-                <Tooltip content={CurrencyTooltip} />
-                <Line
-                  type="monotone"
-                  dataKey="total"
-                  name="Total"
-                  stroke={CHART_COLORS[0]}
-                  strokeWidth={2}
-                  dot={{ r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <ChartCard title="Gasto mensual" subtitle="Últimos 6 meses">
+        {monthlySeriesData.every((point) => point.total === 0) ? (
+          <EmptyChartMessage />
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={monthlySeriesData}>
+              <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="month"
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+              />
+              <YAxis
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={70}
+                tickFormatter={(value) => formatCurrency(Number(value))}
+              />
+              <Tooltip content={CurrencyTooltip} />
+              <Line
+                type="monotone"
+                dataKey="total"
+                name="Total"
+                stroke={CHART_COLORS[0]}
+                strokeWidth={2}
+                dot={{ r: 3 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
 
-        <ChartCard title="Gasto por categoría">
-          {categoryData.length === 0 ? (
-            <EmptyChartMessage />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={categoryData} layout="vertical" margin={{ left: 12 }}>
-                <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  tickFormatter={(value) => formatCurrency(Number(value))}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="category"
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  width={110}
-                />
-                <Tooltip content={CurrencyTooltip} />
-                <Bar dataKey="total" name="Total" radius={[0, 4, 4, 0]}>
-                  {categoryData.map((_, index) => (
-                    <Cell
-                      key={index}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
+      <ChartCard title="Gasto por categoría">
+        {categoryData.length === 0 ? (
+          <EmptyChartMessage />
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart
+              data={categoryData}
+              layout="vertical"
+              margin={{ left: 12 }}
+            >
+              <CartesianGrid stroke={GRID_COLOR} horizontal={false} />
+              <XAxis
+                type="number"
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickFormatter={(value) => formatCurrency(Number(value))}
+              />
+              <YAxis
+                type="category"
+                dataKey="category"
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                width={110}
+              />
+              <Tooltip content={CurrencyTooltip} />
+              <Bar dataKey="total" name="Total" radius={[0, 4, 4, 0]}>
+                {categoryData.map((_, index) => (
+                  <Cell
+                    key={index}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
 
-        <ChartCard title="Distribución por tipo">
-          {typeData.length === 0 ? (
-            <EmptyChartMessage />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={typeData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={2}
-                >
-                  {typeData.map((_, index) => (
-                    <Cell
-                      key={index}
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                    />
-                  ))}
-                </Pie>
-                <Legend />
-                <Tooltip content={CurrencyTooltip} />
-              </PieChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-
-        <ChartCard title="Gasto por integrante">
-          {memberData.length === 0 ? (
-            <EmptyChartMessage />
-          ) : (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={memberData}>
-                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  tickLine={false}
-                />
-                <YAxis
-                  stroke={AXIS_COLOR}
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  width={70}
-                  tickFormatter={(value) => formatCurrency(Number(value))}
-                />
-                <Tooltip content={CurrencyTooltip} />
-                <Bar
-                  dataKey="total"
-                  name="Total"
-                  fill={CHART_COLORS[1]}
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </ChartCard>
-      </div>
-
-      {stats.upcoming30Days.length > 0 && (
-        <ChartCard title="Próximos 30 días">
-          <ul className="flex flex-col divide-y divide-black/[.06] dark:divide-white/[.08]">
-            {stats.upcoming30Days.slice(0, 8).map((item, index) => (
-              <li
-                key={`${item.expenseId}-${index}`}
-                className="flex items-center justify-between gap-3 py-2 text-sm"
+      <ChartCard title="Distribución por tipo">
+        {typeData.length === 0 ? (
+          <EmptyChartMessage />
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <PieChart>
+              <Pie
+                data={typeData}
+                dataKey="value"
+                nameKey="name"
+                innerRadius={60}
+                outerRadius={90}
+                paddingAngle={2}
               >
-                <div>
-                  <p className="font-medium text-black dark:text-zinc-50">
-                    {item.name}
-                  </p>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                    {new Date(item.date).toLocaleDateString("es-MX", {
-                      day: "2-digit",
-                      month: "short",
-                    })}
-                    {item.installmentNumber
-                      ? ` · cuota ${item.installmentNumber}`
-                      : ""}
-                    {!item.materialized ? " · proyectado" : ""}
-                  </p>
-                </div>
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                  {formatCurrency(item.amount)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </ChartCard>
-      )}
+                {typeData.map((_, index) => (
+                  <Cell
+                    key={index}
+                    fill={CHART_COLORS[index % CHART_COLORS.length]}
+                  />
+                ))}
+              </Pie>
+              <Legend />
+              <Tooltip content={CurrencyTooltip} />
+            </PieChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Gasto por integrante">
+        {memberData.length === 0 ? (
+          <EmptyChartMessage />
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={memberData}>
+              <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="name"
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+              />
+              <YAxis
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={70}
+                tickFormatter={(value) => formatCurrency(Number(value))}
+              />
+              <Tooltip content={CurrencyTooltip} />
+              <Bar
+                dataKey="total"
+                name="Total"
+                fill={CHART_COLORS[1]}
+                radius={[4, 4, 0, 0]}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
     </div>
   );
 }

@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo } from "react";
-import { useAsyncData } from "@/hooks/useAsyncData";
+import { useEffect, useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { expensesApi } from "@/services/expenses.api";
+import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
 import { LoadingBar } from "@/components/ui/LoadingBar";
+import { Button } from "@/components/ui/Button";
 import { ChartCard } from "./ChartCard";
 import type { Expense, PeriodResponse } from "@/types/models";
+
+function shiftIsoDate(iso: string, days: number) {
+  const d = new Date(`${iso}T00:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
 
 type DayStatus = "pagado" | "pendiente" | "proyectado";
 
@@ -41,9 +49,50 @@ function isScheduledExpense(
 }
 
 export function ExpenseCalendar({ houseId }: { houseId: string }) {
-  const { data, loading, error } = useAsyncData<PeriodResponse>(() =>
-    expensesApi.period(houseId, { granularity: "mensual" })
-  );
+  const [anchorDate, setAnchorDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [data, setData] = useState<PeriodResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  // Cuando cambia houseId/anchorDate, hay que volver a mostrar el loading y limpiar el
+  // error ANTES de que el effect de abajo dispare el fetch. Se hace en el cuerpo del
+  // render (patrón "adjusting state when a prop changes") en vez de en el propio effect
+  // para no encadenar un setState síncrono dentro de useEffect.
+  const anchorKey = `${houseId}:${anchorDate}`;
+  const [loadedKey, setLoadedKey] = useState(anchorKey);
+  if (loadedKey !== anchorKey) {
+    setLoadedKey(anchorKey);
+    setLoading(true);
+    setError("");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    expensesApi
+      .period(houseId, { granularity: "mensual", date: anchorDate })
+      .then((result: PeriodResponse) => {
+        if (!cancelled) setData(result);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) setError(getErrorMessage(err, "No se pudo cargar el calendario."));
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [houseId, anchorDate]);
+
+  const goPrev = () => {
+    if (!data) return;
+    setAnchorDate(shiftIsoDate(data.period.from.slice(0, 10), -1));
+  };
+  const goNext = () => {
+    if (!data) return;
+    setAnchorDate(shiftIsoDate(data.period.to.slice(0, 10), 1));
+  };
+  const goToday = () => setAnchorDate(new Date().toISOString().slice(0, 10));
 
   const calendar = useMemo(() => {
     const reference = data ? new Date(data.period.from) : new Date();
@@ -112,6 +161,29 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
     <ChartCard
       title="Calendario de gastos"
       subtitle={`${monthLabel[0]?.toUpperCase()}${monthLabel.slice(1)} · realizados y previstos`}
+      headerRight={
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={goPrev}
+            aria-label="Mes anterior"
+            className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={goNext}
+            aria-label="Mes siguiente"
+            className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+          <Button variant="secondary" className="h-8 px-3 text-xs" onClick={goToday}>
+            Hoy
+          </Button>
+        </div>
+      }
     >
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-medium text-zinc-500 dark:text-zinc-400">
         {WEEKDAY_LABELS.map((label) => (

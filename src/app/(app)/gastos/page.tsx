@@ -19,6 +19,7 @@ import { DataTableShell } from "@/components/ui/DataTableShell";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingBar } from "@/components/ui/LoadingBar";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { Pagination } from "@/components/ui/Pagination";
 import { HouseSelector } from "@/components/houses/HouseSelector";
 import {
   ExpenseFormModal,
@@ -56,6 +57,8 @@ const GRANULARITY_OPTIONS: { value: Granularity; label: string }[] = [
   { value: "quincenal", label: "Quincena" },
   { value: "mensual", label: "Mes" },
 ];
+
+const ROWS_PER_PAGE = 10;
 
 type PeriodRow = {
   key: string;
@@ -288,6 +291,26 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
     if (filters.paid === "proyectado" && row.materialized) return false;
     return true;
   });
+
+  const pageCount = Math.max(1, Math.ceil(filteredRows.length / ROWS_PER_PAGE));
+  const [page, setPage] = useState(1);
+  // Si cambia el periodo o los filtros hay que volver a la página 1 (mismo patrón que
+  // loadedKey arriba, ajustando el estado en el cuerpo del render en vez de en un efecto).
+  const pagingKey = `${periodKey}:${filters.type}:${filters.paid}`;
+  const [loadedPagingKey, setLoadedPagingKey] = useState(pagingKey);
+  let clampedPage = page;
+  if (loadedPagingKey !== pagingKey) {
+    setLoadedPagingKey(pagingKey);
+    clampedPage = 1;
+    setPage(1);
+  } else if (page > pageCount) {
+    clampedPage = pageCount;
+    setPage(pageCount);
+  }
+  const pagedRows = filteredRows.slice(
+    (clampedPage - 1) * ROWS_PER_PAGE,
+    clampedPage * ROWS_PER_PAGE
+  );
 
   const totalPeriod = rows.reduce((sum, r) => sum + r.amount, 0);
   const paidTotal = rows.filter((r) => r.paid).reduce((sum, r) => sum + r.amount, 0);
@@ -536,7 +559,7 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
             </tr>
           </thead>
           <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-            {filteredRows.map((row) => {
+            {pagedRows.map((row) => {
               const CategoryIcon = EXPENSE_CATEGORY_ICONS[row.category];
               const categoryLabel = EXPENSE_CATEGORY_LABELS[row.category] ?? row.category;
               return (
@@ -590,6 +613,8 @@ function ExpensesTable({ houseId, credits }: { houseId: string; credits: Credit[
           </tbody>
         </table>
       </DataTableShell>
+
+      <Pagination page={clampedPage} pageCount={pageCount} onPageChange={setPage} />
 
       <CategoryLegend />
 
