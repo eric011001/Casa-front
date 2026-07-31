@@ -15,7 +15,7 @@ function shiftIsoDate(iso: string, days: number) {
   return d.toISOString().slice(0, 10);
 }
 
-type DayStatus = "pagado" | "pendiente" | "proyectado";
+type DayStatus = "pagado" | "pendiente" | "no_pagado" | "proyectado";
 
 type DayItem = {
   key: string;
@@ -30,12 +30,14 @@ const WEEKDAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
 const STATUS_LABELS: Record<DayStatus, string> = {
   pagado: "Pagado",
   pendiente: "Pendiente",
+  no_pagado: "No pagado",
   proyectado: "Proyectado",
 };
 
 const STATUS_DOT_CLASSES: Record<DayStatus, string> = {
   pagado: "bg-green-500",
   pendiente: "bg-amber-500",
+  no_pagado: "bg-red-500",
   proyectado: "bg-zinc-400 dark:bg-zinc-500",
 };
 
@@ -116,9 +118,13 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
           const dayKey = occurrence.date.slice(0, 10);
           const status: DayStatus = !occurrence.materialized
             ? "proyectado"
-            : !scheduled && (group.expense as Expense).paid
-              ? "pagado"
-              : "pendiente";
+            : scheduled
+              ? "pendiente"
+              : (group.expense as Expense).failed
+                ? "no_pagado"
+                : (group.expense as Expense).paid
+                  ? "pagado"
+                  : "pendiente";
           const list = itemsByDay.get(dayKey) ?? [];
           list.push({
             key: `${group.expense._id}-${occurrence.installmentNumber ?? "u"}-${dayKey}`,
@@ -219,14 +225,16 @@ export function ExpenseCalendar({ houseId }: { houseId: string }) {
                   );
                   const isToday = dateKey === todayKey;
                   const dominantStatus: DayStatus | null = items.some(
-                    (item) => item.status === "pendiente",
+                    (item) => item.status === "no_pagado",
                   )
-                    ? "pendiente"
-                    : items.some((item) => item.status === "proyectado")
-                      ? "proyectado"
-                      : items.length
-                        ? "pagado"
-                        : null;
+                    ? "no_pagado"
+                    : items.some((item) => item.status === "pendiente")
+                      ? "pendiente"
+                      : items.some((item) => item.status === "proyectado")
+                        ? "proyectado"
+                        : items.length
+                          ? "pagado"
+                          : null;
 
                   return (
                     <div
