@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -96,6 +98,11 @@ export function StatsPanel({ houseId }: { houseId: string }) {
       name: EXPENSE_TYPE_LABELS[key] ?? key,
       value: value.total,
     }));
+
+  const loanBalanceData = stats.loans.balanceSeries.map((point) => ({
+    month: point.month,
+    total: point.totalOutstandingDebt,
+  }));
 
   const memberData = stats.byMember
     .map((entry) => ({
@@ -205,6 +212,47 @@ export function StatsPanel({ houseId }: { houseId: string }) {
               <Legend />
               <Tooltip content={CurrencyTooltip} />
             </PieChart>
+          </ResponsiveContainer>
+        )}
+      </ChartCard>
+
+      <ChartCard title="Deuda de préstamos" subtitle="Últimos 6 meses">
+        {loanBalanceData.every((point) => point.total === 0) ? (
+          <EmptyChartMessage />
+        ) : (
+          <ResponsiveContainer width="100%" height={260}>
+            <AreaChart data={loanBalanceData}>
+              <defs>
+                <linearGradient id="loanBalanceFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={CHART_COLORS[3]} stopOpacity={0.35} />
+                  <stop offset="100%" stopColor={CHART_COLORS[3]} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="month"
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+              />
+              <YAxis
+                stroke={AXIS_COLOR}
+                fontSize={12}
+                tickLine={false}
+                axisLine={false}
+                width={70}
+                tickFormatter={(value) => formatCurrency(Number(value))}
+              />
+              <Tooltip content={CurrencyTooltip} />
+              <Area
+                type="monotone"
+                dataKey="total"
+                name="Deuda"
+                stroke={CHART_COLORS[3]}
+                strokeWidth={2}
+                fill="url(#loanBalanceFill)"
+              />
+            </AreaChart>
           </ResponsiveContainer>
         )}
       </ChartCard>

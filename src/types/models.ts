@@ -200,6 +200,7 @@ export type ExpenseStats = {
       estimatedRemainingBalance: number;
       settled: boolean;
     }[];
+    balanceSeries: { month: string; totalOutstandingDebt: number }[];
   };
   upcoming30Days: {
     expenseId: string;
