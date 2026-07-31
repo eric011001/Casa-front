@@ -67,7 +67,12 @@ export function ExpenseDetailModal({
         <Row label="Monto">{formatCurrency(expense.amount)}</Row>
 
         <Row label="Estado">
-          {expense.paid ? (
+          {expense.failed ? (
+            <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
+              No pagado
+              {expense.failedAt ? ` · ${formatDateTime(expense.failedAt)}` : ""}
+            </span>
+          ) : expense.paid ? (
             <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700 dark:bg-green-950 dark:text-green-400">
               Pagado{expense.paidAt ? ` · ${formatDateTime(expense.paidAt)}` : ""}
             </span>

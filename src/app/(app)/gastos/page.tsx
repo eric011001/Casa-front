@@ -12,6 +12,7 @@ import {
   Power,
   PowerOff,
   Trash2,
+  XCircle,
 } from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
@@ -71,6 +72,7 @@ type PeriodRow = {
   date: string;
   materialized: boolean;
   paid: boolean;
+  failed: boolean;
   expense: Expense | null;
   // Solo para ocurrencias todavía no generadas: el gasto programado del que salen, y si esta
   // es justo la SIGUIENTE cuota pendiente de generar (única que se puede pagar por adelantado;
@@ -99,6 +101,7 @@ function buildRows(data: PeriodResponse | null): PeriodRow[] {
         date: occurrence.date,
         materialized: occurrence.materialized,
         paid: expense ? expense.paid : false,
+        failed: expense ? expense.failed : false,
         expense,
         scheduledExpenseId: scheduledExpense ? scheduledExpense._id : null,
         canPayInAdvance: Boolean(
@@ -157,6 +160,13 @@ function StatusBadge({ row }: { row: PeriodRow }) {
     return (
       <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
         Próximo
+      </span>
+    );
+  }
+  if (row.failed) {
+    return (
+      <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700 dark:bg-red-950 dark:text-red-400">
+        No pagado
       </span>
     );
   }
@@ -245,6 +255,8 @@ function ExpensesTable({
   const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [applyingId, setApplyingId] = useState<string | null>(null);
+  const [failingExpense, setFailingExpense] = useState<Expense | null>(null);
+  const [failLoading, setFailLoading] = useState(false);
   const [payingScheduledId, setPayingScheduledId] = useState<string | null>(
     null,
   );
@@ -379,6 +391,26 @@ function ExpensesTable({
     }
   };
 
+  const handleFail = async () => {
+    if (!failingExpense) return;
+    setFailLoading(true);
+    try {
+      await expensesApi.fail(houseId, failingExpense._id);
+      toast.success(`"${failingExpense.name}" marcado como no pagado`);
+      setFailingExpense(null);
+      load();
+    } catch (err) {
+      toast.error(
+        getErrorMessage(
+          err,
+          "No se pudo marcar la cuota como no pagada.",
+        ),
+      );
+    } finally {
+      setFailLoading(false);
+    }
+  };
+
   const handleApplyToCredit = async (expense: Expense) => {
     const creditId = creditIdOf(expense.creditAccount);
     if (!creditId) return;
@@ -431,20 +463,32 @@ function ExpensesTable({
           setFormOpen(true);
         },
       },
-      expense.paid
-        ? {
-            label: "Marcar como pendiente",
-            icon: PowerOff,
-            disabled: togglingId === expense._id,
-            onClick: () => handleTogglePaid(expense),
-          }
-        : {
-            label: "Marcar como pagado",
-            icon: Power,
-            disabled: togglingId === expense._id,
-            onClick: () => handleTogglePaid(expense),
-          },
     ];
+    if (!expense.failed) {
+      items.push(
+        expense.paid
+          ? {
+              label: "Marcar como pendiente",
+              icon: PowerOff,
+              disabled: togglingId === expense._id,
+              onClick: () => handleTogglePaid(expense),
+            }
+          : {
+              label: "Marcar como pagado",
+              icon: Power,
+              disabled: togglingId === expense._id,
+              onClick: () => handleTogglePaid(expense),
+            },
+      );
+    }
+    if (expense.type === "prestamo" && !expense.paid && !expense.failed) {
+      items.push({
+        label: "Marcar como no pagado",
+        icon: XCircle,
+        danger: true,
+        onClick: () => setFailingExpense(expense),
+      });
+    }
     if (creditId && !expense.appliedToCredit) {
       items.push({
         label: "Aplicar a tarjeta",
@@ -725,6 +769,19 @@ function ExpensesTable({
         loading={deleteLoading}
         onConfirm={handleDelete}
         onCancel={() => setDeletingExpense(null)}
+      />
+
+      <ConfirmDialog
+        open={Boolean(failingExpense)}
+        title="Marcar cuota como no pagada"
+        description={`¿Seguro que quieres marcar "${
+          failingExpense?.name ?? ""
+        }" como no pagada? Esta acción no se puede deshacer: el monto se redistribuirá entre las cuotas restantes del préstamo.`}
+        confirmLabel="Marcar como no pagada"
+        danger
+        loading={failLoading}
+        onConfirm={handleFail}
+        onCancel={() => setFailingExpense(null)}
       />
     </div>
   );

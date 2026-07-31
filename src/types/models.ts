@@ -41,6 +41,8 @@ export type Expense = {
   installmentNumber: number | null;
   paid: boolean;
   paidAt: string | null;
+  failed: boolean;
+  failedAt: string | null;
   creditAccount?: string | Credit | null;
   appliedToCredit?: boolean;
   createdAt: string;

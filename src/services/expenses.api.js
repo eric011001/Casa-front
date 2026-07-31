@@ -32,6 +32,14 @@ export const expensesApi = {
   unpay: async (houseId, id) =>
     (await httpClient.patch(`/houses/${houseId}/expenses/${id}/unpay`)).data,
 
+  fail: async (houseId, id, failedAt) =>
+    (
+      await httpClient.patch(
+        `/houses/${houseId}/expenses/${id}/fail`,
+        failedAt ? { failedAt } : {}
+      )
+    ).data,
+
   period: async (houseId, params = {}) =>
     (await httpClient.get(`/houses/${houseId}/expenses/period`, { params }))
       .data,
