@@ -69,51 +69,34 @@ export function ShoppingSessionsModal({
             empty={sessions.length === 0}
             emptyMessage="Aún no hay sesiones de compra registradas."
           >
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="border-b border-black/[.08] bg-black/[.02] text-xs uppercase tracking-wide text-zinc-500 dark:border-white/[.145] dark:bg-white/[.03] dark:text-zinc-400">
-                <tr>
-                  <th className="px-4 py-3 font-medium">Lugar</th>
-                  <th className="px-4 py-3 font-medium">Estado</th>
-                  <th className="hidden px-4 py-3 font-medium sm:table-cell">
-                    Creado por
-                  </th>
-                  <th className="hidden px-4 py-3 font-medium md:table-cell">
-                    Fecha
-                  </th>
-                  <th className="px-4 py-3 font-medium">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-black/[.06] dark:divide-white/[.08]">
-                {sessions.map((session) => (
-                  <tr key={session._id}>
-                    <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
+            <div className="flex flex-col divide-y divide-black/[.06] dark:divide-white/[.08]">
+              {sessions.map((session) => (
+                <div key={session._id} className="flex flex-col gap-2 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="min-w-0 truncate font-medium text-black dark:text-zinc-50">
                       {session.name}
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
-                        {SHOPPING_SESSION_STATUS_LABELS[session.status] ??
-                          session.status}
-                      </span>
-                    </td>
-                    <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
-                      {creatorName(session.createdBy)}
-                    </td>
-                    <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 md:table-cell">
-                      {formatDate(session.createdAt)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/lista-de-compras/sesiones/${session._id}`}
-                        onClick={onClose}
-                        className="inline-block rounded-full bg-black/[.06] px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
-                      >
-                        {session.status === "activa" ? "Gestionar" : "Ver"}
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </p>
+                    <span className="shrink-0 rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
+                      {SHOPPING_SESSION_STATUS_LABELS[session.status] ??
+                        session.status}
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-zinc-500 dark:text-zinc-400">
+                    <span>{creatorName(session.createdBy)}</span>
+                    <span>{formatDate(session.createdAt)}</span>
+                  </div>
+
+                  <Link
+                    href={`/lista-de-compras/sesiones/${session._id}`}
+                    onClick={onClose}
+                    className="mt-1 inline-flex w-fit items-center rounded-full bg-black/[.06] px-3 py-1.5 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
+                  >
+                    {session.status === "activa" ? "Gestionar" : "Ver"}
+                  </Link>
+                </div>
+              ))}
+            </div>
           </DataTableShell>
         </div>
       </Modal>

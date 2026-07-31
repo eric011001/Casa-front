@@ -3,7 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import toast from "react-hot-toast";
-import { ArrowLeft, Ban, CheckCircle2, Plus, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Ban,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Pencil,
+  Plus,
+  X,
+} from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -55,6 +65,11 @@ function SessionManageBoard({
   const [cancelLoading, setCancelLoading] = useState(false);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
   const [newProductOpen, setNewProductOpen] = useState(false);
+  const [cartOpen, setCartOpen] = useState(true);
+  const [editingCartPriceId, setEditingCartPriceId] = useState<string | null>(
+    null,
+  );
+  const [priceUpdatingId, setPriceUpdatingId] = useState<string | null>(null);
 
   const { items: allItems, reload: reloadItems } = useAsyncList<ShoppingListItem>(
     () => shoppingListApi.list(houseId),
@@ -153,6 +168,34 @@ function SessionManageBoard({
     }
   };
 
+  const startEditCartPrice = (item: ShoppingListItem) => {
+    setPriceDrafts((prev) => ({
+      ...prev,
+      [item._id]: item.precio != null ? String(item.precio) : "",
+    }));
+    setEditingCartPriceId(item._id);
+  };
+
+  const handleUpdateCartPrice = async (itemId: string) => {
+    const trimmed = priceDrafts[itemId]?.trim();
+    const precio = Number(trimmed);
+    if (!trimmed || Number.isNaN(precio) || precio < 0) {
+      toast.error("Ingresa un precio válido.");
+      return;
+    }
+    setPriceUpdatingId(itemId);
+    try {
+      await shoppingListApi.update(houseId, itemId, { precio });
+      setEditingCartPriceId(null);
+      load();
+      reloadItems();
+    } catch (err) {
+      toast.error(getErrorMessage(err, "No se pudo actualizar el precio."));
+    } finally {
+      setPriceUpdatingId(null);
+    }
+  };
+
   const handleNewProduct = async (values: ShoppingListItemFormValues) => {
     const precio = values.precio ? Number(values.precio) : undefined;
     const created: ShoppingListItem = await shoppingListApi.create(houseId, {
@@ -207,17 +250,21 @@ function SessionManageBoard({
 
       {session && (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <span className="rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <span className="w-fit rounded-full bg-black/[.06] px-2.5 py-1 text-xs font-medium text-zinc-700 dark:bg-white/[.08] dark:text-zinc-300">
               {SHOPPING_SESSION_STATUS_LABELS[session.status] ?? session.status}
             </span>
             {isActive && (
-              <div className="flex gap-2">
-                <Button variant="secondary" onClick={() => setCancelOpen(true)}>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button
+                  variant="secondary"
+                  className="w-full sm:w-auto"
+                  onClick={() => setCancelOpen(true)}
+                >
                   <Ban className="h-4 w-4" />
                   Cancelar
                 </Button>
-                <Button onClick={() => setCloseOpen(true)}>
+                <Button className="w-full sm:w-auto" onClick={() => setCloseOpen(true)}>
                   <CheckCircle2 className="h-4 w-4" />
                   Cerrar sesión
                 </Button>
@@ -239,55 +286,118 @@ function SessionManageBoard({
           {isActive && (
             <div className="grid gap-6 lg:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                <button
+                  type="button"
+                  onClick={() => setCartOpen((v) => !v)}
+                  className="flex items-center justify-between gap-2 rounded-lg py-1 text-left"
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-medium text-zinc-700 dark:text-zinc-300">
+                    {cartOpen ? (
+                      <ChevronUp className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 shrink-0" />
+                    )}
                     Carrito
-                  </p>
-                  <p className="text-sm font-medium text-black dark:text-zinc-50">
+                    {cartItems.length > 0 && (
+                      <span className="text-zinc-400">({cartItems.length})</span>
+                    )}
+                  </span>
+                  <span className="shrink-0 text-sm font-medium text-black dark:text-zinc-50">
                     {cartHasMissingPrice ? "Aprox. " : ""}
                     {formatCurrency(cartTotal)}
-                  </p>
-                </div>
-                {cartItems.length === 0 ? (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    Aún no has agregado productos al carrito.
-                  </p>
-                ) : (
-                  <ul className="flex flex-col gap-2">
-                    {cartItems.map((item) => (
-                      <li
-                        key={item._id}
-                        className="flex items-center justify-between rounded-lg border border-black/[.08] px-3 py-2 text-sm dark:border-white/[.145]"
-                      >
-                        <span className="text-zinc-700 dark:text-zinc-300">
-                          {item.name}{" "}
-                          <span className="text-zinc-400">×{item.quantity}</span>
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-zinc-500 dark:text-zinc-400">
-                            {item.precio != null
-                              ? formatCurrency(item.precio * item.quantity)
-                              : "Sin precio"}
+                  </span>
+                </button>
+                {cartOpen &&
+                  (cartItems.length === 0 ? (
+                    <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                      Aún no has agregado productos al carrito.
+                    </p>
+                  ) : (
+                    <ul className="flex flex-col gap-2">
+                      {cartItems.map((item) => (
+                        <li
+                          key={item._id}
+                          className="flex flex-col gap-2 rounded-lg border border-black/[.08] p-3 text-sm dark:border-white/[.145] sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
+                            {item.name}{" "}
+                            <span className="text-zinc-400">
+                              ×{item.quantity}
+                            </span>
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveItem(item._id)}
-                            disabled={removingId === item._id}
-                            aria-label="Quitar del carrito"
-                            title="Quitar del carrito"
-                            className="rounded-lg p-1.5 text-red-600 hover:bg-red-600/10 disabled:opacity-50 dark:text-red-400"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                          {editingCartPriceId === item._id ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                autoFocus
+                                placeholder="Precio unitario"
+                                aria-label={`Precio de ${item.name}`}
+                                value={priceDrafts[item._id] ?? ""}
+                                onChange={(e) =>
+                                  setPriceDrafts((prev) => ({
+                                    ...prev,
+                                    [item._id]: e.target.value,
+                                  }))
+                                }
+                                className="w-24 rounded-lg border border-black/[.08] bg-transparent px-2 py-1 text-sm text-black outline-none focus:border-black/[.3] dark:border-white/[.145] dark:text-zinc-50 dark:focus:border-white/[.3]"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateCartPrice(item._id)}
+                                disabled={priceUpdatingId === item._id}
+                                aria-label="Guardar precio"
+                                title="Guardar precio"
+                                className="rounded-lg p-1.5 text-green-600 hover:bg-green-600/10 disabled:opacity-50 dark:text-green-400"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setEditingCartPriceId(null)}
+                                disabled={priceUpdatingId === item._id}
+                                aria-label="Cancelar edición"
+                                title="Cancelar"
+                                className="rounded-lg p-1.5 text-zinc-500 hover:bg-black/[.06] disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-between gap-3 sm:justify-end">
+                              <button
+                                type="button"
+                                onClick={() => startEditCartPrice(item)}
+                                className="flex items-center gap-1.5 text-zinc-500 hover:text-black dark:text-zinc-400 dark:hover:text-zinc-50"
+                                aria-label={`Editar precio de ${item.name}`}
+                                title="Editar precio"
+                              >
+                                {item.precio != null
+                                  ? formatCurrency(item.precio * item.quantity)
+                                  : "Sin precio"}
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveItem(item._id)}
+                                disabled={removingId === item._id}
+                                aria-label="Quitar del carrito"
+                                title="Quitar del carrito"
+                                className="rounded-lg p-1.5 text-red-600 hover:bg-red-600/10 disabled:opacity-50 dark:text-red-400"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  ))}
               </div>
 
               <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
                     Agregar productos pendientes
                   </p>
@@ -309,13 +419,13 @@ function SessionManageBoard({
                     {pendingItems.map((item) => (
                       <li
                         key={item._id}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-black/[.08] px-3 py-2 text-sm dark:border-white/[.145]"
+                        className="flex flex-col gap-2 rounded-lg border border-black/[.08] p-3 text-sm dark:border-white/[.145] sm:flex-row sm:items-center sm:justify-between"
                       >
-                        <span className="text-zinc-700 dark:text-zinc-300">
+                        <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
                           {item.name}{" "}
                           <span className="text-zinc-400">×{item.quantity}</span>
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-2 sm:justify-end">
                           {item.precio != null ? (
                             <span className="text-zinc-500 dark:text-zinc-400">
                               {formatCurrency(item.precio)}
@@ -372,9 +482,9 @@ function SessionManageBoard({
                   {boughtItems.map((item) => (
                     <li
                       key={item._id}
-                      className="flex items-center justify-between rounded-lg border border-black/[.08] px-3 py-2 text-sm dark:border-white/[.145]"
+                      className="flex flex-col gap-1 rounded-lg border border-black/[.08] p-3 text-sm dark:border-white/[.145] sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <span className="text-zinc-700 dark:text-zinc-300">
+                      <span className="min-w-0 truncate text-zinc-700 dark:text-zinc-300">
                         {item.name}{" "}
                         <span className="text-zinc-400">×{item.quantity}</span>
                       </span>
