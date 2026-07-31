@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import { Plus } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
@@ -13,8 +14,7 @@ import {
   ShoppingSessionFormModal,
   type ShoppingSessionFormValues,
 } from "./ShoppingSessionFormModal";
-import { ShoppingSessionDetailModal } from "./ShoppingSessionDetailModal";
-import type { ShoppingListItem, ShoppingSession } from "@/types/models";
+import type { ShoppingSession } from "@/types/models";
 
 function creatorName(createdBy: ShoppingSession["createdBy"]) {
   return typeof createdBy === "string"
@@ -33,13 +33,9 @@ function formatDate(date: string) {
 export function ShoppingSessionsModal({
   onClose,
   houseId,
-  pendingItems,
-  onItemsChanged,
 }: {
   onClose: () => void;
   houseId: string;
-  pendingItems: ShoppingListItem[];
-  onItemsChanged: () => void;
 }) {
   const {
     items: sessions,
@@ -49,17 +45,11 @@ export function ShoppingSessionsModal({
   } = useAsyncList<ShoppingSession>(() => shoppingSessionsApi.list(houseId));
 
   const [sessionFormOpen, setSessionFormOpen] = useState(false);
-  const [detailSessionId, setDetailSessionId] = useState<string | null>(null);
 
   const handleSessionSubmit = async (values: ShoppingSessionFormValues) => {
     await shoppingSessionsApi.create(houseId, { name: values.name.trim() });
     toast.success("Sesión de compra iniciada");
     reload();
-  };
-
-  const handleChanged = () => {
-    reload();
-    onItemsChanged();
   };
 
   return (
@@ -112,13 +102,13 @@ export function ShoppingSessionsModal({
                       {formatDate(session.createdAt)}
                     </td>
                     <td className="px-4 py-3">
-                      <button
-                        type="button"
-                        onClick={() => setDetailSessionId(session._id)}
-                        className="rounded-full bg-black/[.06] px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
+                      <Link
+                        href={`/lista-de-compras/sesiones/${session._id}`}
+                        onClick={onClose}
+                        className="inline-block rounded-full bg-black/[.06] px-3 py-1 text-xs font-medium text-zinc-700 hover:bg-black/[.1] dark:bg-white/[.08] dark:text-zinc-300"
                       >
                         {session.status === "activa" ? "Gestionar" : "Ver"}
-                      </button>
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -133,16 +123,6 @@ export function ShoppingSessionsModal({
         onClose={() => setSessionFormOpen(false)}
         onSubmit={handleSessionSubmit}
       />
-
-      {detailSessionId && (
-        <ShoppingSessionDetailModal
-          houseId={houseId}
-          sessionId={detailSessionId}
-          pendingItems={pendingItems}
-          onClose={() => setDetailSessionId(null)}
-          onChanged={handleChanged}
-        />
-      )}
     </>
   );
 }

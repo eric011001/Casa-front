@@ -50,8 +50,6 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
 
   const [sessionsModalOpen, setSessionsModalOpen] = useState(false);
 
-  const pendingItems = items.filter((item) => item.status === "pendiente");
-
   const handleItemSubmit = async (values: ShoppingListItemFormValues) => {
     const payload = {
       name: values.name.trim(),
@@ -270,9 +268,7 @@ function ShoppingListBoard({ houseId }: { houseId: string }) {
       {sessionsModalOpen && (
         <ShoppingSessionsModal
           houseId={houseId}
-          pendingItems={pendingItems}
           onClose={() => setSessionsModalOpen(false)}
-          onItemsChanged={reloadItems}
         />
       )}
 
