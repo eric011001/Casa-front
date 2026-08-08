@@ -6,9 +6,13 @@ import toast from "react-hot-toast";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
+import { SelectField } from "@/components/ui/SelectField";
 import { getErrorMessage } from "@/lib/http-error";
+import { CREDIT_TYPE_OPTIONS } from "@/lib/credit-plan-labels";
+import type { CreditType } from "@/types/models";
 
 export type CreditFormValues = {
+  type: CreditType;
   name: string;
   bank: string;
   currentDebt: string;
@@ -16,6 +20,7 @@ export type CreditFormValues = {
 };
 
 const EMPTY_VALUES: CreditFormValues = {
+  type: "tarjeta_credito",
   name: "",
   bank: "",
   currentDebt: "0",
@@ -23,6 +28,7 @@ const EMPTY_VALUES: CreditFormValues = {
 };
 
 const schema = Yup.object({
+  type: Yup.string().oneOf(["tarjeta_credito", "credito_personal"]),
   name: Yup.string().trim().required("El nombre es requerido"),
   bank: Yup.string(),
   currentDebt: Yup.number()
@@ -61,7 +67,7 @@ export function CreditFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={isEdit ? "Editar tarjeta" : "Nueva tarjeta"}
+      title={isEdit ? "Editar crédito" : "Nuevo crédito"}
     >
       <Formik
         enableReinitialize
@@ -79,6 +85,25 @@ export function CreditFormModal({
       >
         {({ isSubmitting }) => (
           <Form className="flex flex-col gap-4">
+            {isEdit ? (
+              <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                Tipo:{" "}
+                <span className="font-medium">
+                  {CREDIT_TYPE_OPTIONS.find(
+                    (opt) => opt.value === initialValues?.type
+                  )?.label ?? initialValues?.type}
+                </span>
+              </p>
+            ) : (
+              <SelectField label="Tipo" name="type">
+                {CREDIT_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </SelectField>
+            )}
+
             <TextField label="Nombre" name="name" type="text" />
             <TextField label="Banco" name="bank" type="text" />
 
@@ -110,7 +135,7 @@ export function CreditFormModal({
                 Cancelar
               </Button>
               <Button type="submit" loading={isSubmitting}>
-                {isEdit ? "Guardar cambios" : "Crear tarjeta"}
+                {isEdit ? "Guardar cambios" : "Crear crédito"}
               </Button>
             </div>
           </Form>

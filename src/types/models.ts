@@ -72,7 +72,8 @@ export type DebtHistoryType =
   | "gasto"
   | "interes"
   | "pago_plan"
-  | "reversion_pago";
+  | "reversion_pago"
+  | "ajuste_manual";
 
 export type DebtHistoryEntry = {
   date: string;
@@ -83,14 +84,19 @@ export type DebtHistoryEntry = {
   plan: string | null;
 };
 
+export type CreditType = "tarjeta_credito" | "credito_personal";
+
 export type Credit = {
   _id: string;
   user: string;
+  type: CreditType;
   name: string;
   bank?: string;
   currentDebt: number;
   limit: number;
   active: boolean;
+  sharedWith: string[];
+  isOwner?: boolean;
   debtHistory: DebtHistoryEntry[];
   createdAt: string;
   updatedAt: string;
@@ -138,6 +144,8 @@ export type CreditStats = {
   };
   byCard: {
     id: string;
+    type: CreditType;
+    isOwner: boolean;
     name: string;
     bank?: string;
     currentDebt: number;

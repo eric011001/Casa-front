@@ -17,6 +17,15 @@ export const creditsApi = {
   applyExpense: async (id, expenseId) =>
     (await httpClient.post(`/credits/${id}/apply-expense`, { expenseId })).data,
 
+  adjustDebt: async (id, payload) =>
+    (await httpClient.post(`/credits/${id}/adjust-debt`, payload)).data,
+
+  share: async (id, email) =>
+    (await httpClient.post(`/credits/${id}/share`, { email })).data,
+
+  unshare: async (id, userId) =>
+    (await httpClient.delete(`/credits/${id}/share/${userId}`)).data,
+
   stats: async () => (await httpClient.get("/credits/stats")).data,
 
   getPlan: async (id) => (await httpClient.get(`/credits/${id}/plan`)).data,
@@ -32,11 +41,11 @@ export const creditsApi = {
   applyInterest: async (id, payload) =>
     (await httpClient.post(`/credits/${id}/plan/interest`, payload)).data,
 
-  payInstallment: async (id, number, paidAt) =>
+  payInstallment: async (id, number, options = {}) =>
     (
       await httpClient.post(
         `/credits/${id}/plan/installments/${number}/pay`,
-        paidAt ? { paidAt } : {}
+        options
       )
     ).data,
 

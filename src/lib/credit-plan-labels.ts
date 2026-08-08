@@ -21,4 +21,14 @@ export const DEBT_HISTORY_TYPE_LABELS: Record<string, string> = {
   interes: "Interés",
   pago_plan: "Pago de plan",
   reversion_pago: "Reversión de pago",
+  ajuste_manual: "Ajuste manual",
 };
+
+export const CREDIT_TYPE_LABELS: Record<string, string> = {
+  tarjeta_credito: "Tarjeta de crédito",
+  credito_personal: "Crédito personal",
+};
+
+export const CREDIT_TYPE_OPTIONS = Object.entries(CREDIT_TYPE_LABELS).map(
+  ([value, label]) => ({ value, label })
+);

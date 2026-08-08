@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { LoadingBar } from "@/components/ui/LoadingBar";
 import { creditsApi } from "@/services/credits.api";
+import { useMyHouses } from "@/hooks/useMyHouses";
 import { getErrorMessage, getErrorStatus } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
 import { CREDIT_PLAN_STATUS_LABELS } from "@/lib/credit-plan-labels";
@@ -19,7 +20,15 @@ import {
   CreditInterestModal,
   type CreditInterestFormValues,
 } from "./CreditInterestModal";
-import type { Credit, CreditPaymentPlan } from "@/types/models";
+import {
+  CreditPayInstallmentModal,
+  type CreditPayInstallmentFormValues,
+} from "./CreditPayInstallmentModal";
+import type {
+  Credit,
+  CreditPaymentPlan,
+  CreditPlanInstallment,
+} from "@/types/models";
 
 function formatDate(date: string) {
   return new Date(date).toLocaleDateString("es-MX", {
@@ -38,6 +47,9 @@ export function CreditPlanModal({
   onClose: () => void;
   onCreditChange: (credit: Credit) => void;
 }) {
+  const isOwner = credit.isOwner ?? true;
+  const { houses } = useMyHouses();
+
   const [plan, setPlan] = useState<CreditPaymentPlan | null>(null);
   const [history, setHistory] = useState<CreditPaymentPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +63,8 @@ export function CreditPlanModal({
   const [installmentLoading, setInstallmentLoading] = useState<number | null>(
     null
   );
+  const [payingInstallment, setPayingInstallment] =
+    useState<CreditPlanInstallment | null>(null);
 
   const fetchPlanAndHistory = useCallback(
     () =>
@@ -142,15 +156,28 @@ export function CreditPlanModal({
     }
   };
 
-  const handlePayInstallment = async (number: number) => {
+  const handlePayInstallment = async (
+    values: CreditPayInstallmentFormValues
+  ) => {
+    if (!payingInstallment) return;
+    const number = payingInstallment.number;
     setInstallmentLoading(number);
     try {
-      const result = await creditsApi.payInstallment(credit._id, number);
+      const options: Record<string, unknown> = {};
+      if (values.generateExpense) {
+        options.generateExpense = true;
+        options.houseId = values.houseId;
+        options.category = values.category;
+        if (values.name.trim()) options.name = values.name.trim();
+      }
+      const result = await creditsApi.payInstallment(
+        credit._id,
+        number,
+        options
+      );
       onCreditChange(result.credit);
       setPlan(result.plan);
       toast.success(`Cuota ${number} pagada`);
-    } catch (err) {
-      toast.error(getErrorMessage(err, "No se pudo pagar la cuota."));
     } finally {
       setInstallmentLoading(null);
     }
@@ -187,10 +214,21 @@ export function CreditPlanModal({
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
                 Esta tarjeta no tiene un plan de pago activo.
               </p>
-              <Button onClick={() => setCreateOpen(true)}>
-                <Plus className="h-4 w-4" />
-                Crear plan de pago
-              </Button>
+              {isOwner && (
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button onClick={() => setCreateOpen(true)}>
+                    <Plus className="h-4 w-4" />
+                    Crear plan de pago
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={() => setInterestOpen(true)}
+                  >
+                    <Percent className="h-4 w-4" />
+                    Aplicar interés
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -231,7 +269,7 @@ export function CreditPlanModal({
                 </div>
               </div>
 
-              {plan.status === "activo" && (
+              {plan.status === "activo" && isOwner && (
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="secondary"
@@ -296,7 +334,7 @@ export function CreditPlanModal({
                           ) : (
                             <button
                               type="button"
-                              onClick={() => handlePayInstallment(inst.number)}
+                              onClick={() => setPayingInstallment(inst)}
                               disabled={installmentLoading === inst.number}
                               className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-green-700 hover:bg-green-600/10 disabled:opacity-60 dark:text-green-400"
                             >
@@ -367,6 +405,18 @@ export function CreditPlanModal({
         onConfirm={handleCancelPlan}
         onCancel={() => setCancelOpen(false)}
       />
+
+      {payingInstallment && (
+        <CreditPayInstallmentModal
+          open
+          onClose={() => setPayingInstallment(null)}
+          onSubmit={handlePayInstallment}
+          installmentNumber={payingInstallment.number}
+          installmentAmount={payingInstallment.amount}
+          houses={houses}
+          defaultName={`Pago plan - ${credit.name}`}
+        />
+      )}
     </>
   );
 }

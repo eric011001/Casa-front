@@ -2,7 +2,15 @@
 
 import { useState } from "react";
 import toast from "react-hot-toast";
-import { CalendarClock, CreditCard, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  CalendarClock,
+  CreditCard,
+  Pencil,
+  Plus,
+  Share2,
+  SlidersHorizontal,
+  Trash2,
+} from "lucide-react";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/Button";
 import { DataTableShell } from "@/components/ui/DataTableShell";
@@ -13,15 +21,22 @@ import {
   type CreditFormValues,
 } from "@/components/credits/CreditFormModal";
 import { CreditPlanModal } from "@/components/credits/CreditPlanModal";
+import { CreditShareModal } from "@/components/credits/CreditShareModal";
+import {
+  CreditAdjustDebtModal,
+  type CreditAdjustDebtFormValues,
+} from "@/components/credits/CreditAdjustDebtModal";
 import { useAsyncList } from "@/hooks/useAsyncList";
 import { useAsyncData } from "@/hooks/useAsyncData";
 import { creditsApi } from "@/services/credits.api";
 import { getErrorMessage } from "@/lib/http-error";
 import { formatCurrency } from "@/lib/format";
+import { CREDIT_TYPE_LABELS } from "@/lib/credit-plan-labels";
 import type { Credit, CreditStats } from "@/types/models";
 
 function creditToFormValues(credit: Credit): CreditFormValues {
   return {
+    type: credit.type,
     name: credit.name,
     bank: credit.bank ?? "",
     currentDebt: String(credit.currentDebt),
@@ -35,7 +50,10 @@ function buildCreditPayload(values: CreditFormValues, isEdit: boolean) {
     limit: Number(values.limit),
   };
   if (values.bank.trim()) payload.bank = values.bank.trim();
-  if (!isEdit) payload.currentDebt = Number(values.currentDebt || 0);
+  if (!isEdit) {
+    payload.type = values.type;
+    payload.currentDebt = Number(values.currentDebt || 0);
+  }
   return payload;
 }
 
@@ -49,12 +67,28 @@ function CreditsContent() {
   const [deletingCredit, setDeletingCredit] = useState<Credit | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [planCredit, setPlanCredit] = useState<Credit | null>(null);
+  const [sharingCredit, setSharingCredit] = useState<Credit | null>(null);
+  const [adjustingCredit, setAdjustingCredit] = useState<Credit | null>(null);
 
   const handleCreditChange = (updated: Credit) => {
     setCredits((prev) =>
       prev.map((c) => (c._id === updated._id ? updated : c))
     );
-    setPlanCredit(updated);
+    setPlanCredit((prev) =>
+      prev && prev._id === updated._id ? updated : prev
+    );
+    setSharingCredit((prev) =>
+      prev && prev._id === updated._id ? updated : prev
+    );
+  };
+
+  const handleAdjustDebt = async (values: CreditAdjustDebtFormValues) => {
+    if (!adjustingCredit) return;
+    const payload: Record<string, unknown> = { delta: Number(values.delta) };
+    if (values.reason.trim()) payload.reason = values.reason.trim();
+    const result = await creditsApi.adjustDebt(adjustingCredit._id, payload);
+    handleCreditChange(result.credit);
+    toast.success("Deuda ajustada correctamente");
   };
 
   const handleSubmit = async (values: CreditFormValues) => {
@@ -164,12 +198,20 @@ function CreditsContent() {
                     ? "bg-amber-500"
                     : "bg-green-500";
 
+              const isOwner = credit.isOwner ?? true;
+
               return (
                 <tr key={credit._id}>
                   <td className="px-4 py-3 font-medium text-black dark:text-zinc-50">
                     <span className="flex items-center gap-2">
                       <CreditCard className="h-4 w-4 shrink-0 text-zinc-400" />
-                      {credit.name}
+                      <span className="flex flex-col">
+                        {credit.name}
+                        <span className="text-xs font-normal text-zinc-500 dark:text-zinc-400">
+                          {CREDIT_TYPE_LABELS[credit.type] ?? credit.type}
+                          {!isOwner && " · Compartido contigo"}
+                        </span>
+                      </span>
                     </span>
                   </td>
                   <td className="hidden px-4 py-3 text-zinc-600 dark:text-zinc-400 sm:table-cell">
@@ -200,27 +242,49 @@ function CreditsContent() {
                       >
                         <CalendarClock className="h-4 w-4" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditingCredit(credit);
-                          setFormOpen(true);
-                        }}
-                        aria-label="Editar tarjeta"
-                        title="Editar"
-                        className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setDeletingCredit(credit)}
-                        aria-label="Eliminar tarjeta"
-                        title="Eliminar"
-                        className="rounded-lg p-2 text-red-600 hover:bg-red-600/10 dark:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {isOwner && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setAdjustingCredit(credit)}
+                            aria-label="Ajustar deuda"
+                            title="Ajustar deuda"
+                            className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                          >
+                            <SlidersHorizontal className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSharingCredit(credit)}
+                            aria-label="Compartir crédito"
+                            title="Compartir"
+                            className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                          >
+                            <Share2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingCredit(credit);
+                              setFormOpen(true);
+                            }}
+                            aria-label="Editar tarjeta"
+                            title="Editar"
+                            className="rounded-lg p-2 text-zinc-500 hover:bg-black/[.06] dark:text-zinc-400 dark:hover:bg-white/[.08]"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeletingCredit(credit)}
+                            aria-label="Eliminar tarjeta"
+                            title="Eliminar"
+                            className="rounded-lg p-2 text-red-600 hover:bg-red-600/10 dark:text-red-400"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -259,6 +323,20 @@ function CreditsContent() {
           onCreditChange={handleCreditChange}
         />
       )}
+
+      {sharingCredit && (
+        <CreditShareModal
+          credit={sharingCredit}
+          onClose={() => setSharingCredit(null)}
+          onCreditChange={handleCreditChange}
+        />
+      )}
+
+      <CreditAdjustDebtModal
+        open={Boolean(adjustingCredit)}
+        onClose={() => setAdjustingCredit(null)}
+        onSubmit={handleAdjustDebt}
+      />
     </div>
   );
 }
